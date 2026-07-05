@@ -6,6 +6,7 @@ import { applyLayers } from '../../utils/watermarkEngine'
 import { TextWatermarkForm } from './TextWatermarkForm'
 import { ImageWatermarkForm } from './ImageWatermarkForm'
 import { PatternWatermarkForm } from './PatternWatermarkForm'
+import { PresetManager } from './PresetManager'
 import { DEFAULT_TEXT_PARAMS, DEFAULT_IMAGE_PARAMS, DEFAULT_PATTERN_PARAMS } from '../../types'
 import type { WatermarkParams } from '../../types'
 
@@ -62,6 +63,7 @@ export function WatermarkPanel() {
     <div className='watermark-panel'>
       <div className='watermark-panel-header'>
         <h3>{t.watermark.title}</h3>
+      <PresetManager />
       </div>
 
       {/* Layer list */}
