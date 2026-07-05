@@ -1,0 +1,79 @@
+﻿import { useRef } from 'react'
+import { useAppStore } from '../../stores/useAppStore'
+import { useTranslation } from '../../i18n/useTranslation'
+import { readFileAsDataUrl } from '../../utils/fileUtils'
+import type { PositionPreset } from '../../types'
+
+const BLEND_MODES = ['normal','multiply','screen','overlay','darken','lighten']
+const POSITIONS: { value: PositionPreset; label: string }[] = [
+  { value: 'top-left', label: '\u256D' }, { value: 'top-center', label: '\u252C' }, { value: 'top-right', label: '\u256E' },
+  { value: 'center-left', label: '\u251C' }, { value: 'center', label: '\u253C' }, { value: 'center-right', label: '\u2524' },
+  { value: 'bottom-left', label: '\u2570' }, { value: 'bottom-center', label: '\u2534' }, { value: 'bottom-right', label: '\u256F' },
+]
+
+export function ImageWatermarkForm() {
+  const t = useTranslation()
+  const p = useAppStore((s) => s.imageParams)
+  const set = useAppStore((s) => s.setImageParams)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const dataUrl = await readFileAsDataUrl(file)
+    set({ logoDataUrl: dataUrl, logoFileName: file.name })
+  }
+
+  return (
+    <div>
+      <div className='param-group'>
+        <label className='param-label'>{t.watermark.logoImage}</label>
+        <input ref={inputRef} type='file' accept='image/*' style={{ display: 'none' }} onChange={handleLogoUpload} />
+        {p.logoDataUrl ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <img src={p.logoDataUrl} alt='logo' style={{ width: 48, height: 48, objectFit: 'contain', borderRadius: 'var(--radius-sm)', background: 'var(--bg-elevated)' }} />
+            <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)', flex: 1 }}>{p.logoFileName}</span>
+            <button className='btn-sm-icon' onClick={() => set({ logoDataUrl: null, logoFileName: '' })}>X</button>
+          </div>
+        ) : (
+          <button className='btn-secondary' onClick={() => inputRef.current?.click()}>
+            Select Logo Image
+          </button>
+        )}
+      </div>
+
+      <div className='param-group'>
+        <label className='param-label'>{t.watermark.scale}: {p.scale}%</label>
+        <input type='range' min='1' max='100' value={p.scale} onChange={(e) => set({ scale: Number(e.target.value) })} />
+      </div>
+
+      <div className='param-group'>
+        <label className='param-label'>{t.watermark.opacity}: {p.opacity}%</label>
+        <input type='range' min='0' max='100' value={p.opacity} onChange={(e) => set({ opacity: Number(e.target.value) })} />
+      </div>
+
+      <div className='param-group'>
+        <label className='param-label'>{t.watermark.blendMode}</label>
+        <select value={p.blendMode} onChange={(e) => set({ blendMode: e.target.value as any })}>
+          {BLEND_MODES.map((m) => (<option key={m} value={m}>{m}</option>))}
+        </select>
+      </div>
+
+      <div className='param-group'>
+        <label className='param-label'>{t.watermark.rotation}: {p.rotation}\u00B0</label>
+        <input type='range' min='-180' max='180' value={p.rotation} onChange={(e) => set({ rotation: Number(e.target.value) })} />
+      </div>
+
+      <div className='param-group'>
+        <label className='param-label'>{t.watermark.position}</label>
+        <div className='position-grid'>
+          {POSITIONS.map((pos) => (
+            <button key={pos.value} className={'position-btn' + (p.position.preset === pos.value ? ' active' : '')}
+              onClick={() => set({ position: { ...p.position, preset: pos.value } })}>{pos.label}</button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
