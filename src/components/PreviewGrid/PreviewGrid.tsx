@@ -22,12 +22,12 @@ export function PreviewGrid() {
   const [compareMode, setCompareMode] = useState<CompareMode>('processed')
   const [previews, setPreviews] = useState<Record<string, string>>({})
 
-  // Recalculate previews when params or images change
+  // Recalculate previews when params, images, or processed state changes
   useEffect(() => {
     const params = getActiveParams()
-    const pending = images.filter((i) => i.status === 'pending')
-    if (pending.length === 0) return
-    pending.forEach(async (img) => {
+    const previewable = images.filter((i) => i.status !== 'processing')
+    if (previewable.length === 0) return
+    previewable.forEach(async (img) => {
       try {
         const preview = await generatePreview(img.dataUrl, params, 300)
         setPreviews((prev) => ({ ...prev, [img.id]: preview }))
@@ -35,12 +35,13 @@ export function PreviewGrid() {
         // preview failed
       }
     })
-  }, [activeWatermarkType, textParams, imageParams, patternParams, images.length])
+  }, [activeWatermarkType, textParams, imageParams, patternParams, images.length, images.filter(i => i.status === 'done').length])
 
   const getDisplayUrl = useCallback(
     (img) => {
       if (compareMode === 'original') return img.dataUrl
-      return img.processedDataUrl || previews[img.id] || img.dataUrl
+      // Use preview thumbnails for grid display so text size is consistent
+      return previews[img.id] || img.processedDataUrl || img.dataUrl
     },
     [compareMode, previews]
   )
@@ -99,4 +100,3 @@ export function PreviewGrid() {
     </div>
   )
 }
-

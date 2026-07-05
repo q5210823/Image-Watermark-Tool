@@ -20,7 +20,7 @@ export function ExportDialog() {
     const blob = await canvasToBlob(img.processedDataUrl, exportSettings.format, exportSettings.quality)
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    const baseName = img.name.replace(/\\.[^.]+$/, '')
+    const baseName = img.name.replace(/\.[^.]+$/, '')
     a.href = url
     a.download = baseName + '.' + exportSettings.format
     document.body.appendChild(a)
@@ -41,7 +41,7 @@ export function ExportDialog() {
       for (const img of doneImages) {
         if (!img.processedDataUrl) continue
         const blob = await canvasToBlob(img.processedDataUrl, exportSettings.format, exportSettings.quality)
-        const baseName = img.name.replace(/\\.[^.]+$/, '')
+        const baseName = img.name.replace(/\.[^.]+$/, '')
         zip.file(baseName + '.' + exportSettings.format, blob)
       }
 
@@ -93,7 +93,7 @@ export function ExportDialog() {
         <div className='dialog-actions'>
           <button className='btn-secondary' onClick={() => setShowExportDialog(false)}>{t.common.cancel}</button>
           <button className='btn-primary' onClick={handleExportAll} disabled={doneImages.length === 0 || exporting}>
-            <Archive size={16} /> {exporting ? '{t.common.processing}' : '{t.export_.zipExport}'}
+            <Archive size={16} /> {exporting ? t.common.processing : t.export_.zipExport}
           </button>
         </div>
 
@@ -115,5 +115,3 @@ export function ExportDialog() {
     </div>
   )
 }
-
-

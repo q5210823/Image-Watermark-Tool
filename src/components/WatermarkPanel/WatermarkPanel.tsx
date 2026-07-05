@@ -26,13 +26,14 @@ export function WatermarkPanel() {
   const getActiveParams = useAppStore((s) => s.getActiveParams)
 
   const handleProcessAll = useCallback(async () => {
-    const pending = images.filter((i) => i.status === 'pending' || i.status === 'error')
-    if (pending.length === 0) return
+    // Allow reprocessing: process all non-processing images (includes 'done' ones)
+    const toProcess = images.filter((i) => i.status !== 'processing')
+    if (toProcess.length === 0) return
     setProcessing(true)
     const params = getActiveParams()
-    for (let i = 0; i < pending.length; i++) {
-      const img = pending[i]
-      setProcessingProgress({ current: i + 1, total: pending.length })
+    for (let i = 0; i < toProcess.length; i++) {
+      const img = toProcess[i]
+      setProcessingProgress({ current: i + 1, total: toProcess.length })
       updateImageStatus(img.id, 'processing')
       try {
         const result = await applyWatermark(img.dataUrl, params)
