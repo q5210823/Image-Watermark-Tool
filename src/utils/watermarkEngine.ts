@@ -151,19 +151,32 @@ export async function applyWatermark(
   canvas.width = img.naturalWidth;
   canvas.height = img.naturalHeight;
   const ctx = canvas.getContext("2d")!;
-
   ctx.drawImage(img, 0, 0);
 
-  switch (params.type) {
-    case "text":
-      await renderTextWatermark(ctx, canvas.width, canvas.height, params as TextWatermarkParams);
-      break;
-    case "image":
-      await renderImageWatermark(ctx, canvas.width, canvas.height, params as ImageWatermarkParams);
-      break;
-    case "pattern":
-      await renderPatternWatermark(ctx, canvas.width, canvas.height, params as PatternWatermarkParams);
-      break;
+  // Scale parameters proportionally so watermark looks the same as in preview
+  // Preview renders at max 300px width; full image has 'canvas.width' pixels
+  const PREVIEW_REFERENCE = 300;
+  const s = Math.max(1, canvas.width / PREVIEW_REFERENCE);
+
+  if (params.type === 'text') {
+    const p = { ...params };
+    p.fontSize = Math.round(p.fontSize * s);
+    p.margin = Math.round(p.margin * s);
+    if (p.stroke?.enabled) p.stroke = { ...p.stroke, width: Math.max(1, Math.round(p.stroke.width * s)) };
+    if (p.shadow?.enabled) p.shadow = { ...p.shadow, blur: Math.round(p.shadow.blur * s), offsetX: Math.round(p.shadow.offsetX * s), offsetY: Math.round(p.shadow.offsetY * s) };
+    await renderTextWatermark(ctx, canvas.width, canvas.height, p);
+  } else if (params.type === 'image') {
+    await renderImageWatermark(ctx, canvas.width, canvas.height, params);
+  } else if (params.type === 'pattern') {
+    const p = { ...params };
+    if (p.patternStyle === 'grid') {
+      p.gridSpacing = Math.round(p.gridSpacing * s);
+      p.gridLineWidth = Math.max(1, Math.round(p.gridLineWidth * s));
+    } else if (p.patternStyle === 'diagonal') {
+      p.diagSpacing = Math.round(p.diagSpacing * s);
+      p.diagLineWidth = Math.max(1, Math.round(p.diagLineWidth * s));
+    }
+    await renderPatternWatermark(ctx, canvas.width, canvas.height, p);
   }
 
   return canvas.toDataURL("image/png");
@@ -218,3 +231,4 @@ export function canvasToBlob(dataUrl: string, format: string, quality: number): 
     img.src = dataUrl;
   });
 }
+
