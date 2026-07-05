@@ -1,12 +1,15 @@
 ﻿import { useRef } from 'react'
-import { useAppStore } from '../../stores/useAppStore'
 import { useTranslation } from '../../i18n/useTranslation'
 import { readFileAsDataUrl } from '../../utils/fileUtils'
+import type { PatternWatermarkParams } from '../../types'
 
-export function PatternWatermarkForm() {
+interface Props {
+  params: PatternWatermarkParams;
+  onChange: (params: Partial<PatternWatermarkParams>) => void;
+}
+
+export function PatternWatermarkForm({ params: p, onChange: set }: Props) {
   const t = useTranslation()
-  const p = useAppStore((s) => s.patternParams)
-  const set = useAppStore((s) => s.setPatternParams)
   const inputRef = useRef<HTMLInputElement>(null)
 
   return (
@@ -59,7 +62,7 @@ export function PatternWatermarkForm() {
             </div>
           </div>
           <div className='param-group'>
-            <label className='param-label'>{t.watermark.rotation}: {p.diagAngle}\u00B0</label>
+            <label className='param-label'>{t.watermark.rotation}: {p.diagAngle}°</label>
             <input type='range' min='0' max='180' value={p.diagAngle} onChange={(e) => set({ diagAngle: Number(e.target.value) })} />
           </div>
           <div className='param-group'>
@@ -98,4 +101,3 @@ export function PatternWatermarkForm() {
     </div>
   )
 }
-

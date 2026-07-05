@@ -1,6 +1,5 @@
-﻿import { useAppStore } from '../../stores/useAppStore'
-import { useTranslation } from '../../i18n/useTranslation'
-import type { PositionPreset } from '../../types'
+﻿import { useTranslation } from '../../i18n/useTranslation'
+import type { TextWatermarkParams, PositionPreset } from '../../types'
 
 const POSITIONS: { value: PositionPreset; label: string }[] = [
   { value: 'top-left', label: 'TL' }, { value: 'top-center', label: 'TC' }, { value: 'top-right', label: 'TR' },
@@ -8,10 +7,13 @@ const POSITIONS: { value: PositionPreset; label: string }[] = [
   { value: 'bottom-left', label: 'BL' }, { value: 'bottom-center', label: 'BC' }, { value: 'bottom-right', label: 'BR' },
 ]
 
-export function TextWatermarkForm() {
+interface Props {
+  params: TextWatermarkParams;
+  onChange: (params: Partial<TextWatermarkParams>) => void;
+}
+
+export function TextWatermarkForm({ params: p, onChange: set }: Props) {
   const t = useTranslation()
-  const p = useAppStore((s) => s.textParams)
-  const set = useAppStore((s) => s.setTextParams)
 
   return (
     <div>
@@ -38,9 +40,7 @@ export function TextWatermarkForm() {
 
       <div className='param-group'>
         <label className='param-label'>{t.watermark.size}: {p.fontSize}px</label>
-        <div className='slider-with-value'>
-          <input type='range' min='12' max='200' value={p.fontSize} onChange={(e) => set({ fontSize: Number(e.target.value) })} />
-        </div>
+        <input type='range' min='12' max='200' value={p.fontSize} onChange={(e) => set({ fontSize: Number(e.target.value) })} />
       </div>
 
       <div className='param-group'>
@@ -57,20 +57,20 @@ export function TextWatermarkForm() {
       </div>
 
       <div className='param-group'>
-        <label className='param-label'>{t.watermark.rotation}: {p.rotation}\u00B0</label>
+        <label className='param-label'>{t.watermark.rotation}: {p.rotation}°</label>
         <input type='range' min='-180' max='180' value={p.rotation} onChange={(e) => set({ rotation: Number(e.target.value) })} />
       </div>
 
       <div className='param-group'>
         <div className='switch-row'>
-          <span style={{ margin: 0 }} className='param-label'>{t.watermark.shadow}</span>
+          <span className='param-label'>{t.watermark.shadow}</span>
           <div className={'switch' + (p.shadow?.enabled ? ' active' : '')} onClick={() => set({ shadow: p.shadow?.enabled ? null : { enabled: true, color: '#000000', blur: 4, offsetX: 2, offsetY: 2 } })} />
         </div>
       </div>
 
       <div className='param-group'>
         <div className='switch-row'>
-          <span style={{ margin: 0 }} className='param-label'>{t.watermark.stroke}</span>
+          <span className='param-label'>{t.watermark.stroke}</span>
           <div className={'switch' + (p.stroke?.enabled ? ' active' : '')} onClick={() => set({ stroke: p.stroke?.enabled ? null : { enabled: true, color: '#000000', width: 2 } })} />
         </div>
       </div>
@@ -97,4 +97,3 @@ export function TextWatermarkForm() {
     </div>
   )
 }
-

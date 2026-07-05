@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect, useCallback } from 'react'
 import { Image, Download, ZoomIn, Grid3X3, SlidersHorizontal } from 'lucide-react'
 import { useAppStore } from '../../stores/useAppStore'
-import { applyWatermark, generatePreview } from '../../utils/watermarkEngine'
+import { applyLayers, generateLayersPreview } from '../../utils/watermarkEngine'
 import { useTranslation } from '../../i18n/useTranslation'
 
 type CompareMode = 'original' | 'processed'
@@ -11,12 +11,12 @@ export function PreviewGrid() {
   const images = useAppStore((s) => s.images)
   const selectedImageId = useAppStore((s) => s.selectedImageId)
   const setSelectedImageId = useAppStore((s) => s.setSelectedImageId)
-  const getActiveParams = useAppStore((s) => s.getActiveParams)
-  const updateImageStatus = useAppStore((s) => s.updateImageStatus)
-  const activeWatermarkType = useAppStore((s) => s.activeWatermarkType)
-  const textParams = useAppStore((s) => s.textParams)
-  const imageParams = useAppStore((s) => s.imageParams)
-  const patternParams = useAppStore((s) => s.patternParams)
+  const getEnabledLayers = useAppStore((s) => s.getEnabledLayers)
+  const layers = useAppStore((s) => s.layers)
+
+
+
+
   const setShowExportDialog = useAppStore((s) => s.setShowExportDialog)
 
   const [compareMode, setCompareMode] = useState<CompareMode>('processed')
@@ -24,18 +24,18 @@ export function PreviewGrid() {
 
   // Recalculate previews when params or images change
   useEffect(() => {
-    const params = getActiveParams()
+    const enabledLayers = getEnabledLayers()
     const pending = images.filter((i) => i.status === 'pending')
     if (pending.length === 0) return
     pending.forEach(async (img) => {
       try {
-        const preview = await generatePreview(img.dataUrl, params, 300)
+        const preview = await generateLayersPreview(img.dataUrl, enabledLayers, 300)
         setPreviews((prev) => ({ ...prev, [img.id]: preview }))
       } catch (e) {
         // preview failed
       }
     })
-  }, [activeWatermarkType, textParams, imageParams, patternParams, images.length])
+  }, [layers, images.length])
 
   const getDisplayUrl = useCallback(
     (img) => {
@@ -99,4 +99,5 @@ export function PreviewGrid() {
     </div>
   )
 }
+
 

@@ -99,6 +99,12 @@ export interface ExportSettings {
   naming: NamingRule;
 }
 
+export interface WatermarkLayer {
+  id: string;
+  enabled: boolean;
+  name: string;
+  params: WatermarkParams;
+}
 export const DEFAULT_TEXT_PARAMS: TextWatermarkParams = {
   type: 'text',
   content: 'Watermark',
@@ -136,3 +142,4 @@ export const DEFAULT_PATTERN_PARAMS: PatternWatermarkParams = {
   diagSpacing: 80,
   opacity: 30,
 };
+

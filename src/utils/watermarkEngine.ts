@@ -218,3 +218,25 @@ export function canvasToBlob(dataUrl: string, format: string, quality: number): 
     img.src = dataUrl;
   });
 }
+export async function applyLayers(
+  sourceDataUrl: string, layers: { enabled: boolean; params: import('../types').WatermarkParams }[]
+): Promise<string> {
+  let current = sourceDataUrl;
+  for (const layer of layers) {
+    if (!layer.enabled) continue;
+    current = await applyWatermark(current, layer.params);
+  }
+  return current;
+}
+
+export async function generateLayersPreview(
+  sourceDataUrl: string, layers: { enabled: boolean; params: import('../types').WatermarkParams }[],
+  maxWidth: number = 400
+): Promise<string> {
+  let current = sourceDataUrl;
+  for (const layer of layers) {
+    if (!layer.enabled) continue;
+    current = await generatePreview(current, layer.params, maxWidth);
+  }
+  return current;
+}

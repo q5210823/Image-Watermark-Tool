@@ -1,20 +1,22 @@
 ﻿import { useRef } from 'react'
-import { useAppStore } from '../../stores/useAppStore'
 import { useTranslation } from '../../i18n/useTranslation'
 import { readFileAsDataUrl } from '../../utils/fileUtils'
-import type { PositionPreset } from '../../types'
+import type { ImageWatermarkParams, PositionPreset } from '../../types'
 
 const BLEND_MODES = ['normal','multiply','screen','overlay','darken','lighten']
 const POSITIONS: { value: PositionPreset; label: string }[] = [
-  { value: 'top-left', label: '\u256D' }, { value: 'top-center', label: '\u252C' }, { value: 'top-right', label: '\u256E' },
-  { value: 'center-left', label: '\u251C' }, { value: 'center', label: '\u253C' }, { value: 'center-right', label: '\u2524' },
-  { value: 'bottom-left', label: '\u2570' }, { value: 'bottom-center', label: '\u2534' }, { value: 'bottom-right', label: '\u256F' },
+  { value: 'top-left', label: 'TL' }, { value: 'top-center', label: 'TC' }, { value: 'top-right', label: 'TR' },
+  { value: 'center-left', label: 'CL' }, { value: 'center', label: 'C' }, { value: 'center-right', label: 'CR' },
+  { value: 'bottom-left', label: 'BL' }, { value: 'bottom-center', label: 'BC' }, { value: 'bottom-right', label: 'BR' },
 ]
 
-export function ImageWatermarkForm() {
+interface Props {
+  params: ImageWatermarkParams;
+  onChange: (params: Partial<ImageWatermarkParams>) => void;
+}
+
+export function ImageWatermarkForm({ params: p, onChange: set }: Props) {
   const t = useTranslation()
-  const p = useAppStore((s) => s.imageParams)
-  const set = useAppStore((s) => s.setImageParams)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -36,9 +38,7 @@ export function ImageWatermarkForm() {
             <button className='btn-sm-icon' onClick={() => set({ logoDataUrl: null, logoFileName: '' })}>X</button>
           </div>
         ) : (
-          <button className='btn-secondary' onClick={() => inputRef.current?.click()}>
-            Select Logo Image
-          </button>
+          <button className='btn-secondary' onClick={() => inputRef.current?.click()}>{t.watermark.selectLogo}</button>
         )}
       </div>
 
@@ -60,7 +60,7 @@ export function ImageWatermarkForm() {
       </div>
 
       <div className='param-group'>
-        <label className='param-label'>{t.watermark.rotation}: {p.rotation}\u00B0</label>
+        <label className='param-label'>{t.watermark.rotation}: {p.rotation}°</label>
         <input type='range' min='-180' max='180' value={p.rotation} onChange={(e) => set({ rotation: Number(e.target.value) })} />
       </div>
 
@@ -76,4 +76,3 @@ export function ImageWatermarkForm() {
     </div>
   )
 }
-
