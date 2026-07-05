@@ -71,7 +71,7 @@ export interface PatternWatermarkParams {
   opacity: number;
 }
 
-export type WatermarkParams = TextWatermarkParams | ImageWatermarkParams | PatternWatermarkParams;
+export type WatermarkParams = TextWatermarkParams | ImageWatermarkParams | PatternWatermarkParams | WatermarkRemovalParams;
 
 export interface ImageItem {
   id: string;
@@ -136,3 +136,50 @@ export const DEFAULT_PATTERN_PARAMS: PatternWatermarkParams = {
   diagSpacing: 80,
   opacity: 30,
 };
+
+export type RemoverMethod = 'lama' | 'opencv';
+
+export interface WatermarkRemovalParams {
+  type: 'remover';
+  confidence: number;
+  padding: number;
+  method: RemoverMethod;
+  fallbackCorner: boolean;
+  corner: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
+  cornerWidth: number;
+  cornerHeight: number;
+  forceCorner: boolean;
+}
+
+export const DEFAULT_REMOVER_PARAMS: WatermarkRemovalParams = {
+  type: 'remover',
+  confidence: 0.5,
+  padding: 10,
+  method: 'lama',
+  fallbackCorner: true,
+  corner: 'bottom-right',
+  cornerWidth: 0.12,
+  cornerHeight: 0.08,
+  forceCorner: false,
+};
+
+export interface DetectionBox {
+  bbox: [number, number, number, number];
+  confidence: number;
+  fallback?: boolean;
+}
+
+export interface DetectionResult {
+  detections: DetectionBox[];
+  usingFallback: boolean;
+}
+export interface EditableBbox {
+  id: string;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  confidence: number;
+  fallback?: boolean;
+  locked?: boolean;
+}

@@ -1,4 +1,4 @@
-﻿export const zh: typeof import('./en').en = {
+﻿export const zh: typeof import("./en").en = {
   common: {
     import: '导入',
     clear: '清空',
@@ -14,6 +14,7 @@
     noImages: '暂无图片',
     dropHint: '拖拽图片到此处或点击浏览',
     language: '语言',
+    download: '下载',
   },
   files: {
     title: '文件',
@@ -58,4 +59,33 @@
     imagesReady: '张图片可导出',
     download: '下载',
   },
+  remover: {
+    title: '去水印',
+    detect: '检测',
+    remove: '去除',
+    detectAll: '全部检测',
+    removeAll: '全部去除',
+    confidence: '检测置信度',
+    padding: '扩展像素',
+    method: '修复方法',
+    lama: 'LaMa (高质量)',
+    opencv: 'OpenCV (快速)',
+    fallback: '角标回退',
+    corner: '角标位置',
+    cornerWidth: '角标宽度',
+    cornerHeight: '角标高度',
+    forceCorner: '强制角标',
+    detectionPreview: '检测预览',
+    noDetections: '未检测到水印',
+    detectionsFound: '处检测结果',
+    usingFallback: '使用角标回退',
+    processing: '正在去除水印...',
+    envCheck: '环境检测',
+    envReady: '环境就绪',
+    envMissing: 'Python 环境未就绪',
+    installGuide: '安装 Python 后执行: pip install watermark-remover',
+    downloadModel: '下载模型',
+    applyToAll: '应用到全部',
+  },
 }
+

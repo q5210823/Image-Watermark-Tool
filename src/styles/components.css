@@ -605,3 +605,331 @@ input[type='color'] {
   box-shadow: var(--shadow-lg);
 }
 
+
+/* Small button */
+.btn-sm {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  transition: var(--transition);
+}
+.btn-sm:hover { background: var(--bg-hover); color: var(--text-primary); }
+.btn-sm.disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Spin animation */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.spin { animation: spin 1s linear infinite; }
+
+/* Card zoom icon */
+.preview-card-zoom {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  color: rgba(255,255,255,0.7);
+  background: rgba(0,0,0,0.4);
+  border-radius: 4px;
+  padding: 4px;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+.preview-card:hover .preview-card-zoom { opacity: 1; }
+
+/* Viewer overlay with close button */
+.viewer-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0,0,0,0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-out;
+  animation: fadeIn 0.2s ease;
+}
+.viewer-overlay img {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 8px;
+  cursor: default;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+  animation: scaleIn 0.25s ease;
+}
+.viewer-close {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  background: rgba(255,255,255,0.15);
+  border: none;
+  color: #fff;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+  z-index: 1001;
+}
+.viewer-close:hover { background: rgba(255,255,255,0.3); }
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes scaleIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* Detection Preview Container */
+.detection-preview-container {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--bg-elevated);
+  user-select: none;
+}
+.detection-preview-container .detection-preview-image {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Detection Box Overlay */
+.detection-box {
+  position: absolute;
+  border: 2px solid rgba(59, 130, 246, 0.8);
+  background: rgba(59, 130, 246, 0.1);
+  cursor: move;
+  border-radius: 3px;
+  transition: border-color 0.15s;
+  z-index: 10;
+}
+.detection-box:hover {
+  border-color: rgba(59, 130, 246, 1);
+  background: rgba(59, 130, 246, 0.15);
+}
+
+/* Box label (top-left) */
+.detection-box-label {
+  position: absolute;
+  top: -18px;
+  left: -1px;
+  background: rgba(59, 130, 246, 0.9);
+  color: #fff;
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px 3px 0 0;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* Box remove button */
+.detection-box-remove {
+  position: absolute;
+  top: -18px;
+  right: -1px;
+  background: rgba(239, 68, 68, 0.9);
+  color: #fff;
+  border: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 0 3px 0 3px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.detection-box:hover .detection-box-remove { opacity: 1; }
+.detection-box-remove:hover { background: rgba(239, 68, 68, 1); }
+
+/* Resize handles */
+.detect-box-handle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: #fff;
+  border: 1.5px solid rgba(59, 130, 246, 0.9);
+  border-radius: 50%;
+  z-index: 11;
+}
+.detect-box-handle.nw { top: -4px; left: -4px; cursor: nw-resize; }
+.detect-box-handle.ne { top: -4px; right: -4px; cursor: ne-resize; }
+.detect-box-handle.sw { bottom: -4px; left: -4px; cursor: sw-resize; }
+.detect-box-handle.se { bottom: -4px; right: -4px; cursor: se-resize; }
+.detect-box-handle.n { top: -4px; left: 50%; margin-left: -4px; cursor: n-resize; }
+.detect-box-handle.s { bottom: -4px; left: 50%; margin-left: -4px; cursor: s-resize; }
+.detect-box-handle.w { top: 50%; left: -4px; margin-top: -4px; cursor: w-resize; }
+.detect-box-handle.e { top: 50%; right: -4px; margin-top: -4px; cursor: e-resize; }
+
+/* Thumbnail detection box (remover mode) */
+.det-thumb-box {
+  position: absolute;
+  border: 1.5px solid rgba(59, 130, 246, 0.7);
+  background: rgba(59, 130, 246, 0.08);
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 5;
+}
+.preview-card.has-det {
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.4);
+}
+
+/* Detection Editor overlay (full-size viewer with draggable boxes) */
+.det-editor-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0,0,0,0.88);
+  display: flex;
+  flex-direction: column;
+  animation: fadeIn 0.2s ease;
+}
+.det-editor-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: rgba(0,0,0,0.5);
+  z-index: 1001;
+  flex-shrink: 0;
+}
+.det-editor-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 6px;
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.det-editor-btn:hover { background: rgba(255,255,255,0.18); }
+.det-editor-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  padding: 20px;
+}
+.det-editor-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 4px;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* Reusable detection box with handles (for both editor and form) */
+.det-box {
+  position: absolute;
+  border: 2px solid rgba(59, 130, 246, 0.85);
+  background: rgba(59, 130, 246, 0.08);
+  cursor: move;
+  border-radius: 3px;
+  z-index: 20;
+}
+.det-box:hover {
+  border-color: rgba(59, 130, 246, 1);
+  background: rgba(59, 130, 246, 0.15);
+}
+.det-box-label {
+  position: absolute;
+  top: -17px;
+  left: -1px;
+  background: rgba(59, 130, 246, 0.85);
+  color: #fff;
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px 3px 0 0;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.det-box-x {
+  position: absolute;
+  top: -17px;
+  right: -1px;
+  background: rgba(239,68,68,0.85);
+  color: #fff;
+  width: 17px;
+  height: 17px;
+  border-radius: 0 3px 0 3px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.det-box:hover .det-box-x { opacity: 1; }
+
+/* Resize handles */
+.det-handle {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  background: #fff;
+  border: 1.5px solid rgba(59, 130, 246, 0.9);
+  border-radius: 50%;
+  z-index: 21;
+}
+.det-handle.nw { top: -4.5px; left: -4.5px; cursor: nw-resize; }
+.det-handle.ne { top: -4.5px; right: -4.5px; cursor: ne-resize; }
+.det-handle.sw { bottom: -4.5px; left: -4.5px; cursor: sw-resize; }
+.det-handle.se { bottom: -4.5px; right: -4.5px; cursor: se-resize; }
+.det-handle.n { top: -4.5px; left: 50%; margin-left: -4.5px; cursor: n-resize; }
+.det-handle.s { bottom: -4.5px; left: 50%; margin-left: -4.5px; cursor: s-resize; }
+.det-handle.w { top: 50%; left: -4.5px; margin-top: -4.5px; cursor: w-resize; }
+.det-handle.e { top: 50%; right: -4.5px; margin-top: -4.5px; cursor: e-resize; }
+
+/* Interactive thumbnail detection box with delete button */
+.det-thumb-box {
+  position: absolute;
+  border: 1.5px solid rgba(59, 130, 246, 0.7);
+  background: rgba(59, 130, 246, 0.08);
+  border-radius: 2px;
+  cursor: move;
+  z-index: 5;
+  transition: border-color 0.15s, background 0.15s;
+}
+.det-thumb-box:hover {
+  border-color: rgba(59, 130, 246, 1);
+  background: rgba(59, 130, 246, 0.2);
+  border-width: 2px;
+}
+.det-thumb-x {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 14px;
+  height: 14px;
+  background: rgba(239,68,68,0.9);
+  color: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 6;
+}
+.det-thumb-box:hover .det-thumb-x { opacity: 1; }

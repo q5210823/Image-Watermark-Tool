@@ -3,9 +3,10 @@ import type {
   ImageItem, WatermarkParams, WatermarkType,
   ExportSettings, PositionPreset,
   TextWatermarkParams, ImageWatermarkParams, PatternWatermarkParams,
+  WatermarkRemovalParams, DetectionBox, EditableBbox,
 } from '../types';
 import {
-  DEFAULT_TEXT_PARAMS, DEFAULT_IMAGE_PARAMS, DEFAULT_PATTERN_PARAMS,
+  DEFAULT_TEXT_PARAMS, DEFAULT_IMAGE_PARAMS, DEFAULT_PATTERN_PARAMS, DEFAULT_REMOVER_PARAMS,
 } from '../types';
 
 interface AppState {
@@ -20,8 +21,8 @@ interface AppState {
   reorderImages: (from: number, to: number) => void;
 
   // Watermark type
-  activeWatermarkType: WatermarkType;
-  setActiveWatermarkType: (type: WatermarkType) => void;
+  activeWatermarkType: WatermarkType | 'remover';
+  setActiveWatermarkType: (type: WatermarkType | 'remover') => void;
 
   // Watermark params
   textParams: TextWatermarkParams;
@@ -30,8 +31,20 @@ interface AppState {
   setImageParams: (params: Partial<ImageWatermarkParams>) => void;
   patternParams: PatternWatermarkParams;
   setPatternParams: (params: Partial<PatternWatermarkParams>) => void;
+  removerParams: WatermarkRemovalParams;
+  setRemoverParams: (params: Partial<WatermarkRemovalParams>) => void;
 
   getActiveParams: () => WatermarkParams;
+
+  // Detection results for remover
+  detectionResults: Record<string, DetectionBox[]>;
+  setDetectionResults: (imageId: string, detections: DetectionBox[]) => void;
+  clearDetectionResults: () => void;
+
+  // User-adjusted bboxes per image (for draggable preview)
+  userBboxes: Record<string, EditableBbox[]>;
+  setUserBboxes: (imageId: string, boxes: EditableBbox[]) => void;
+  clearUserBboxes: () => void;
 
   // Processing
   isProcessing: boolean;
@@ -82,6 +95,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   setImageParams: (params) => set((s) => ({ imageParams: { ...s.imageParams, ...params } })),
   patternParams: { ...DEFAULT_PATTERN_PARAMS },
   setPatternParams: (params) => set((s) => ({ patternParams: { ...s.patternParams, ...params } })),
+  removerParams: { ...DEFAULT_REMOVER_PARAMS },
+  setRemoverParams: (params) => set((s) => ({ removerParams: { ...s.removerParams, ...params } })),
 
   getActiveParams: () => {
     const s = get();
@@ -89,8 +104,19 @@ export const useAppStore = create<AppState>((set, get) => ({
       case 'text': return s.textParams;
       case 'image': return s.imageParams;
       case 'pattern': return s.patternParams;
+      case 'remover': return s.removerParams;
     }
   },
+
+  detectionResults: {},
+  setDetectionResults: (imageId, detections) =>
+    set((s) => ({ detectionResults: { ...s.detectionResults, [imageId]: detections } })),
+  clearDetectionResults: () => set({ detectionResults: {} }),
+
+  userBboxes: {},
+  setUserBboxes: (imageId, boxes) =>
+    set((s) => ({ userBboxes: { ...s.userBboxes, [imageId]: boxes } })),
+  clearUserBboxes: () => set({ userBboxes: {} }),
 
   isProcessing: false,
   processingProgress: { current: 0, total: 0 },
@@ -111,4 +137,3 @@ export const useAppStore = create<AppState>((set, get) => ({
   setPreviewScale: (scale) => set({ previewScale: scale }),
   setLanguage: (lang) => set({ language: lang }),
 }));
-
