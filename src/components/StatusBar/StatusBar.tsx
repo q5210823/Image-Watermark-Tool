@@ -2,6 +2,7 @@
 import { useAppStore } from '../../stores/useAppStore'
 import { useTranslation } from '../../i18n/useTranslation'
 import { LanguageToggle } from './LanguageToggle'
+import { ThemeToggle } from './ThemeToggle'
 
 interface Props { onClickExport: () => void }
 
@@ -29,6 +30,7 @@ export function StatusBar({ onClickExport }: Props) {
           <span className='accent-text'>{t.common.processing} {progress.current}/{progress.total}</span>
         )}
         <LanguageToggle />
+        <ThemeToggle />
         {total > 0 && !isProcessing && (
           <button className='btn-primary' onClick={onClickExport}
             style={{ width: 'auto', padding: '6px 14px', fontSize: 'var(--font-size-xs)' }}

@@ -61,3 +61,19 @@
   --transition-fast: 150ms ease;
   --transition-normal: 250ms ease;
 }
+/* Light theme */
+.light {
+  --bg-primary: #F5F5F7;
+  --bg-surface: #FFFFFF;
+  --bg-elevated: #E8E8ED;
+  --bg-hover: #DEDEE3;
+  --bg-active: #D0D0D6;
+  --border: #D0D0D6;
+  --border-light: #E0E0E6;
+  --text-primary: #1A1A1E;
+  --text-secondary: #666670;
+  --text-muted: #9999A0;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.1);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
+}

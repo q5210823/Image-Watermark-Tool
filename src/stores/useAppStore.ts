@@ -10,8 +10,9 @@ import {
 } from '../types';
 
 interface AppState {
+  theme: 'dark' | 'light';
+  setTheme: (theme: 'dark' | 'light') => void;
   language: 'en' | 'zh';
-  setLanguage: (lang: 'en' | 'zh') => void;
   images: ImageItem[];
   addImages: (images: ImageItem[]) => void;
   removeImage: (id: string) => void;
@@ -98,7 +99,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   rightPanelOpen: true,
   setRightPanelOpen: (open) => set({ rightPanelOpen: open }),
   previewScale: 150,
-  language: 'zh' as 'en' | 'zh',
+  theme: 'dark' as 'dark' | 'light',
   setPreviewScale: (scale) => set({ previewScale: scale }),
   setLanguage: (lang) => set({ language: lang }),
 }));

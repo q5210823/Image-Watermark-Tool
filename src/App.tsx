@@ -11,6 +11,7 @@ import type { ImageItem } from './types'
 import './styles/components.css'
 
 export default function App() {
+  const theme = useAppStore((s) => s.theme)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const addImages = useAppStore((s) => s.addImages)
   const showExportDialog = useAppStore((s) => s.showExportDialog)
@@ -56,7 +57,7 @@ export default function App() {
   }
 
   return (
-    <div className='app-layout'>
+    <div className={'app-layout' + (theme === 'light' ? ' light' : '')}>
       <div className='app-main'>
         <ImportPanel onFilesSelected={handleFiles} onClickImport={handleClickImport} />
         <PreviewGrid />
@@ -68,3 +69,4 @@ export default function App() {
     </div>
   )
 }
+
