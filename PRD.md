@@ -1,9 +1,9 @@
-﻿# 批量水印工具 --- 产品需求文档 (PRD)
+# WatermarkForge — 产品需求文档 (PRD)
 
 > **项目代号**: WatermarkForge  
-> **版本**: v0.1 (草案)  
+> **版本**: v2.0 (PRD 重构)  
 > **日期**: 2026-07-05  
-> **技术基底**: Tauri v2 + Rust + React/TypeScript (Vite)
+> **技术基底**: Vite + React + TypeScript (前端) + Python FastAPI (后端)  
 
 ---
 
@@ -16,502 +16,264 @@
 ### 1.2 设计目标
 
 - **本地优先**: 所有图像处理在用户设备上完成，不上传任何文件。
-- **批量高效**: 支持同时导入成百上千张图片并统一施加水印。
+- **批量高效**: 支持同时导入成百上千张图片并统一施加/去除水印。
 - **水印多样性**: 文本、图片(Logo)、图案(平铺/网格/对角线)三类水印。
 - **所见即所得**: 实时预览网格，处理前 vs 处理后对比。
-- **可扩展架构**: 为后续批量修改水印参数、批量去除水印等高级功能预留扩展点。
-- **跨平台**: Windows / macOS / Linux 桌面端。
+- **可扩展架构**: 为后续批量修改水印参数、编辑水印内容等高级功能预留扩展点。
+- **多语言**: 内置中/英文界面切换。
+- **AI 去水印**: 集成 YOLOv8 + LaMa 实现智能水印去除。
 
-### 1.3 参考项目
+### 1.3 版本路线
 
-| 项目 | 参考价值 |
-|---|---|
-| codieshiv/bulk-image-watermarking-tool | 功能参考: 文本/图片/图案水印的丰富定制选项、批量处理、预览网格、ZIP 导出 |
-| gvoze32/digicamwm | 架构参考: Tauri v2 + Rust 后端 + Vite 前端、原生性能、跨平台打包 |
+| 版本 | 代号 | 主要功能 | 状态 |
+|------|------|---------|------|
+| v1.0 | MVP | 图片导入、文本/图片/图案水印、批量预览、ZIP 导出 | ✅ 已发布 |
+| v1.01 | Bugfix | 修复文字缩小、导出乱码、编辑状态保持等 BUG | ✅ 已发布 |
+| v1.02 | Remover | YOLO 检测 + LaMa 去水印、检测框编辑、批量去除 | ✅ 已发布 |
+| v1.03 | Edit (P3) | 水印编辑：OCR 识别 + 样式分析 + 文字替换 | 📋 规划中 |
+
 ---
 
-## 2. 技术架构
+## 2. 当前技术架构
 
 ```
-Windows 桌面应用 (Tauri v2)
+WatermarkForge 桌面应用
 
   +---------------------------+
-  |     Rust 后端              |
-  |   (src-tauri/)             |
-  |   - 图像编解码              |
-  |   - 水印渲染引擎            |
-  |   - ZIP 打包               |
-  |   - 文件 I/O               |
+  |     Vite 开发服务器        |
+  |   (端口 5173)             |
   +-------------+-------------+
-                | (IPC / Tauri Command)
+                | HTTP / REST
+  +-------------+-------------+
+  |     Python FastAPI 后端    |
+  |   (端口 5178)             |
+  |   - 水印去除 (YOLO + LaMa) |
+  |   - 图像修复               |
+  |   - 环境检测               |
+  +-------------+-------------+
+                |
   +-------------+-------------+
   |     Web 前端               |
-  |   (React + Vite)          |
+  |   (React 19 + TypeScript) |
   |   - 拖拽导入界面            |
   |   - 水印参数面板            |
   |   - 实时预览网格            |
+  |   - 检测框编辑              |
   |   - 导出管理               |
+  |   - 中英文切换              |
   +---------------------------+
 ```
 
-Rust crates:
-- **image** -- 图像编解码与像素操作
-- **imageproc** -- 绘图、字体渲染、几何变换
-- **ab_glyph** -- 字体加载与字形渲染
-- **zip** -- ZIP 打包
-- **serde** -- IPC 序列化
+### 2.1 启动方式
 
-### 2.1 分层说明
+用户通过 `start.bat` 一键启动，同时拉起两个服务：
 
-| 层 | 技术选型 | 职责 |
-|---|---|---|
-| Shell | Tauri v2 | 窗口管理、系统菜单、文件对话框、原生拖拽、跨平台打包 |
-| Rust 后端 | Rust + crates | 图像 IO、水印合成核心、批处理调度、ZIP 导出 |
-| IPC 桥 | Tauri invoke + events | 前端调用后端命令、进度事件推送 |
-| Web 前端 | React 18 + TypeScript + Vite | UI 渲染、用户交互、预览缩放、状态管理 |
-
-### 2.2 扩展性设计 (面向未来)
-
-- **插件化水印处理器**: 定义 WatermarkProcessor trait，每种水印类型实现该 trait。后续添加批量修改水印或去水印只需新增 trait 实现。
-- **Pipeline 架构**: 批处理采用责任链模式 (WatermarkPipeline)，可串联多个处理步骤。为后续增加水印修改、格式转换、缩放等工作流做准备。
-- **配置序列化**: 水印参数以 JSON Schema 持久化，支持预设保存/加载，也为后续批量修改提供标准接口。
-
-```rust
-// 扩展点示意 (Rust trait)
-pub trait WatermarkProcessor: Send + Sync {
-    fn name(&self) -> &str;
-    fn process(&self, image: &mut DynamicImage, params: &WatermarkParams) -> Result<()>;
-}
+```bat
+python -m uvicorn server.remover_api:app --host 127.0.0.1 --port 5178
+npx vite --host
 ```
+
+### 2.2 核心依赖
+
+| 层 | 技术选型 | 用途 |
+|---|---|---|
+| 前端框架 | React 19 + TypeScript | UI 渲染 |
+| 打包工具 | Vite 8.x | 开发/构建 |
+| 状态管理 | Zustand 5.x | 全局状态 |
+| UI 图标 | Lucide React | 图标库 |
+| 导出 | JSZip + FileSaver | ZIP 打包下载 |
+| 后端框架 | Python FastAPI + uvicorn | REST API |
+| AI 检测 | YOLOv8 (ultralytics) | 水印目标检测 |
+| AI 修复 | LaMa (PyTorch TorchScript) | 图像修复 |
+| 回退修复 | OpenCV inpainting | 快速修复 |
+
+### 2.3 项目目录结构
+
+```
+J:\Save Edutor/
+├── index.html                 # Vite 入口 HTML
+├── start.bat                  # 启动脚本（前后端同时启动）
+├── package.json               # 前端依赖
+├── vite.config.ts             # Vite 配置
+├── tsconfig.json              # TypeScript 配置
+│
+├── src/                       # 前端源码
+│   ├── main.tsx               # React 入口
+│   ├── App.tsx                # 主应用组件
+│   │
+│   ├── components/            # UI 组件
+│   │   ├── common/
+│   │   │   └── ErrorBoundary.tsx        # 错误边界
+│   │   ├── ImportPanel/                 # 导入面板
+│   │   │   └── ImportPanel.tsx
+│   │   ├── WatermarkPanel/              # 水印配置面板
+│   │   │   ├── WatermarkPanel.tsx        # Tab 切换容器
+│   │   │   ├── TextWatermarkForm.tsx     # 文本水印表单
+│   │   │   ├── ImageWatermarkForm.tsx    # 图片水印表单
+│   │   │   ├── PatternWatermarkForm.tsx  # 图案水印表单
+│   │   │   ├── WatermarkRemovalForm.tsx  # 去水印表单
+│   │   │   └── index.ts
+│   │   ├── PreviewGrid/                 # 预览网格
+│   │   │   └── PreviewGrid.tsx
+│   │   ├── ImageViewer/                 # 图片查看器+检测框编辑
+│   │   │   ├── ImageViewer.tsx
+│   │   │   └── DetectionEditor.tsx      # 可拖拽检测框
+│   │   ├── ExportDialog/                # 导出对话框
+│   │   │   └── ExportDialog.tsx
+│   │   └── StatusBar/                   # 状态栏
+│   │       ├── StatusBar.tsx
+│   │       └── LanguageToggle.tsx       # 中英文切换
+│   │
+│   ├── stores/
+│   │   └── useAppStore.ts               # Zustand 全局状态
+│   │
+│   ├── types/
+│   │   └── index.ts                     # 类型定义
+│   │
+│   ├── utils/
+│   │   ├── watermarkEngine.ts           # 前端 Canvas 水印渲染引擎
+│   │   ├── watermarkRemover.ts          # 去水印 API 客户端
+│   │   ├── fileUtils.ts                 # 文件工具函数
+│   │   └── logger.ts                    # 前端日志
+│   │
+│   ├── i18n/
+│   │   ├── index.ts                     # i18n 配置
+│   │   ├── en.ts                        # 英文翻译
+│   │   ├── zh.ts                        # 中文翻译
+│   │   └── useTranslation.ts            # 翻译 Hook
+│   │
+│   └── styles/
+│       ├── global.css                   # 全局样式
+│       ├── designTokens.css             # 设计 Token
+│       └── components.css               # 组件样式
+│
+├── server/                    # Python 后端
+│   ├── remover_api.py         # FastAPI 主程序（6 个端点）
+│   └── requirements.txt       # Python 依赖
+│
+├── logs/                      # 运行日志
+│   └── python-api.log
+│
+├── dist/                      # 构建产物
+├── node_modules/
+└── public/
+```
+
 ---
 
-## 3. 功能需求
+## 3. 功能需求 — P0: 添加水印 (Add Watermark) ✅ 已完成
 
-### 3.1 P0 --- 核心必达 (MVP)
-
-#### F1: 图片导入
+### 3.1 F1: 图片导入
 
 | 项 | 描述 |
 |---|---|
 | 拖拽导入 | 支持从文件管理器拖入文件夹或图片文件到应用窗口 |
 | 文件选择器 | 通过系统对话框选择单张或多张图片 |
-| 格式支持 | JPEG, PNG, WebP, BMP, TIFF |
+| 格式支持 | JPEG, PNG, WebP, BMP |
 | 文件信息 | 导入后显示文件名、尺寸、格式、大小 |
-| 状态标记 | 已处理/未处理/失败 三种状态标记 |
+| 状态标记 | 待处理 / 处理中 / 已完成 / 失败 四种状态标记 |
 
-#### F2: 文本水印
+### 3.2 F2: 文本水印
 
 | 参数 | 类型 | 默认值 | 说明 |
 |---|---|---|---|
 | 文本内容 | string | Watermark | 用户输入的水印文字 |
-| 字体族 | select | Microsoft YaHei | 系统字体列表 + 自定义 TTF/OTF 导入 |
+| 字体族 | select | Arial | 系统字体列表 |
 | 字号 | number | 36 | px |
 | 颜色 | color picker | #FFFFFF | |
-| 透明度 | slider 0-100 | 70 | |
+| 透明度 | slider 0-100 | 70 | % |
 | 旋转角度 | slider -180~180 | 0 | 度 |
 | 阴影 | switch + config | off | 颜色、模糊半径、偏移 X/Y |
 | 描边 | switch + config | off | 颜色、宽度 |
-| 位置 | presets + free | bottom-right | 9宫格预设 + 拖拽微调 |
+| 位置 | presets | bottom-right | 9 宫格预设位置 |
 | 边距 | number | 20 | 距离边缘的 px |
 
-#### F3: 图片水印 (Logo)
+### 3.3 F3: 图片水印 (Logo)
 
 | 参数 | 类型 | 默认值 | 说明 |
 |---|---|---|---|
 | Logo 图片 | file picker | --- | PNG/JPEG/WebP，建议 PNG 透明背景 |
 | 缩放比例 | slider 1-100 | 25 | 占原图宽度的百分比 |
-| 透明度 | slider 0-100 | 70 | |
-| 混合模式 | select | normal | normal / multiply / screen / overlay / darken / lighten |
-| 位置 | presets + free | bottom-right | 同文本水印 |
-| 旋转 | slider -180~180 | 0 | |
+| 透明度 | slider 0-100 | 70 | % |
+| 混合模式 | select | normal | normal/multiply/screen/overlay/darken/lighten |
+| 位置 | presets | bottom-right | 同文本水印 |
+| 旋转 | slider -180~180 | 0 | 度 |
 
-#### F4: 图案水印
+### 3.4 F4: 图案水印
 
-| 类型 | 参数 | 说明 |
-|---|---|---|
-| 平铺 (Tile) | 图案文件、间距、透明度、缩放 | 用一个小图案平铺覆盖整个图片 |
-| 网格 (Grid) | 线宽、颜色、透明度、间距 | 绘制规则网格线 |
-| 对角线 (Diagonal) | 线宽、颜色、透明度、角度、间距 | 对角线条纹覆盖 |
+| 参数 | 类型 | 默认值 | 说明 |
+|---|---|---|---|
+| 图案样式 | select | grid | tile(平铺)/grid(网格)/diagonal(对角线) |
+| 平铺图片 | file picker | --- | tile 模式: 用户上传平铺用图片 |
+| 网格线宽 | number | 1 | grid 模式: 网格线像素宽度 |
+| 网格颜色 | color picker | #FFFFFF | grid 模式 |
+| 网格间距 | number | 100 | grid 模式: 网格线间距 |
+| 对角线线宽 | number | 2 | diagonal 模式 |
+| 对角线颜色 | color picker | #FFFFFF | diagonal 模式 |
+| 对角线角度 | number | 45 | diagonal 模式: 倾斜角度 |
+| 对角线间距 | number | 80 | diagonal 模式 |
+| 透明度 | slider 0-100 | 30 | % |
 
-#### F5: 批量处理引擎
+### 3.5 F5: 批量预览
 
-| 项 | 描述 |
-|---|---|
-| 并行处理 | Rust 后端 Rayon 并行处理，充分利用多核 CPU |
-| 进度反馈 | Tauri event 实时推送处理进度 (当前 / 总数) |
-| 取消操作 | 处理中允许取消，已处理的保留 |
-| 错误处理 | 单图失败不影响整体，错误日志可查看 |
-| 队列管理 | 支持调整处理顺序、移除图片 |
+- **网格布局**: 缩略图网格展示所有导入图片
+- **前后对比**: 每张图片显示"处理前"vs"处理后"双栏对比
+- **实时更新**: 调整水印参数时实时刷新预览
+- **缩放控制**: 用户可调节网格缩略图尺寸
 
-#### F6: 预览网格
-
-| 项 | 描述 |
-|---|---|
-| 排列 | 缩略图网格展示，可调节缩略图大小 |
-| 对比模式 | 每张卡片显示原图和处理后缩略图，悬停或点击切换 |
-| 缩放查看 | 点击缩略图弹出大图预览，支持缩放和平移 |
-| 实时更新 | 调节水印参数时，当前选中图片的预览异步更新 (Debounce 300ms) |
-
-#### F7: 导出
-
-| 项 | 描述 |
-|---|---|
-| 单张导出 | 右键/点击单张图片 -> 选择保存路径 -> 导出 |
-| 批量 ZIP | 一键打包所有处理后图片为 ZIP |
-| 格式选择 | 导出时可选输出格式 (JPEG/PNG/WebP) |
-| 质量设置 | JPEG/WebP 质量 slider 1-100 |
-| 命名规则 | 保留原名 / 统一前缀 / 序号递增 |
-| 覆盖策略 | 提示/自动重命名/跳过 |
-
-### 3.2 P1 --- 重要功能 (1-2 版本内)
+### 3.6 F6: 导出
 
 | 功能 | 说明 |
 |---|---|
-| 预设管理 | 保存/加载/分享水印配置预设 (JSON 文件) |
-| 水印叠加 | 同时叠加多个水印 (如文本 + Logo + 图案) |
-| EXIF 保留 | 导出时选择是否保留原图 EXIF 信息 |
-| 批量重命名 | 更丰富的命名模板: {日期}_{序号}_{原文件名} |
-| DPI/尺寸保持 | 确保导出的 DPI 和像素尺寸与原始文件一致 |
-| 暗/亮主题 | 系统跟随 + 手动切换 |
-| 多语言 | 中/英文界面 |
+| 单张下载 | 点击单张图片的下载按钮 |
+| ZIP 打包 | 一键打包所有已处理图片 |
+| 格式选择 | PNG / JPEG / WebP |
+| 质量控制 | JPEG/WebP 质量滑块 (1-100) |
+| 命名规则 | 原文件名 / 前缀+原文件名 / 序列号 |
 
-### 3.3 P2 --- 远期扩展
+### 3.7 前端水印渲染引擎
 
-| 功能 | 说明 |
-|---|---|
-| 批量修改水印 | 对已处理的图片: 导入新参数，重新渲染并替换 |
-| 批量去水印 | 基于 AI / 传统算法的水印去除 (功能开关，本地运行) |
-| 批处理脚本 | 定义自动工作流: 导入->水印->缩放->格式转换->导出 |
-| 命令行模式 | 无 GUI 下通过 CLI 参数执行批处理 (headless) |
-| 文件夹监控 | 监听文件夹新增文件并自动施加水印 |
----
+所有水印渲染在前端通过 Canvas 完成，无需后端参与：
 
-## 4. 用户界面设计
-
-### 4.1 布局结构
-
-```
-+-----------------------------------+
-| [菜单栏]  文件 | 预设 | 工具 | 帮助  |
-+----------+------------------------+
-|          |                        |
-| 左侧面板  |     中央预览区          |
-| (260px)  | (缩略图网格/大图预览)    |
-|          |                        |
-| +------+ |  +---+ +---+ +---+    |
-| | 文件  | |  |原 | |处 | |原 |    |
-| | 列表  | |  |图 | |理 | |图 |    |
-| |+拖拽  | |  |   | |后 | |   |    |
-| |导入区 | |  +---+ +---+ +---+    |
-| +------+ |                        |
-|          |                        |
-| +------+ |                        |
-| | 水印  | |                        |
-| | 参数  | |                        |
-| | 面板  | |                        |
-| |(收起) | |                        |
-| +------+ |                        |
-+----------+------------------------+
-| 状态栏: 已导入 12 | 待处理 8 | 完成 4 | [导出] |
-+-----------------------------------+
-```
-
-### 4.2 关键交互流程
-
-1. 导入 -> 拖拽文件夹到窗口左侧区域(或点击导入按钮)
-2. 选择水印类型 -> 右侧参数面板显示对应控件
-3. 调参 -> 中央选中图片实时更新效果
-4. 全部应用 -> 点击[应用到全部]将当前参数应用到所有图片
-5. 批量处理 -> 点击[开始处理]，后端并行渲染，进度条实时更新
-6. 预览+对比 -> 处理完成后网格展示 before/after
-7. 导出 -> 选择单张或 ZIP，配置格式/质量/命名 -> 完成
-
----
-
-## 5. 数据结构
-
-### 5.1 水印参数 (核心数据模型)
+- 文本水印：Canvas fillText + shadow + strokeText
+- 图片水印：Canvas drawImage + globalCompositeOperation
+- 图案水印：Canvas 循环绘制 + 变换矩阵
 
 ```typescript
-type WatermarkType = "text" | "image" | "pattern";
-
-type PositionPreset =
-  | "top-left" | "top-center" | "top-right"
-  | "center-left" | "center" | "center-right"
-  | "bottom-left" | "bottom-center" | "bottom-right";
-
-interface Position {
-  preset: PositionPreset;
-  offsetX: number;
-  offsetY: number;
-}
-
-interface TextWatermarkParams {
-  type: "text";
-  content: string;
-  fontFamily: string;
-  fontSize: number;
-  color: string;
-  opacity: number;
-  rotation: number;
-  shadow: { enabled: boolean; color: string; blur: number; offsetX: number; offsetY: number; } | null;
-  stroke: { enabled: boolean; color: string; width: number; } | null;
-  position: Position;
-  margin: number;
-}
-
-interface ImageWatermarkParams {
-  type: "image";
-  logoPath: string;
-  scale: number;
-  opacity: number;
-  blendMode: BlendMode;
-  rotation: number;
-  position: Position;
-}
-
-interface PatternWatermarkParams {
-  type: "pattern";
-  patternStyle: "tile" | "grid" | "diagonal";
-  tileImage?: string;
-  tileSpacing?: number;
-  gridLineWidth?: number;
-  gridColor?: string;
-  gridSpacing?: number;
-  diagLineWidth?: number;
-  diagColor?: string;
-  diagAngle?: number;
-  diagSpacing?: number;
-  opacity: number;
-}
-
-type WatermarkParams = TextWatermarkParams | ImageWatermarkParams | PatternWatermarkParams;
-
-interface Preset {
-  id: string;
-  name: string;
-  description: string;
-  watermarks: WatermarkParams[];
-  createdAt: string;
-}
-```
-
-### 5.2 IPC 命令接口 (Rust)
-
-```rust
-// 导入图片
-async fn import_images(paths: Vec<String>) -> Result<Vec<ImageInfo>>;
-
-// 处理单张图片
-async fn process_image(input: String, output: String, params: WatermarkParams) -> Result<()>;
-
-// 批量处理
-async fn process_all(images: Vec<BatchItem>, params: WatermarkParams, out_dir: String) -> Result<BatchResult>;
-
-// 导出 ZIP
-async fn export_zip(files: Vec<String>, output: String, format: ExportFormat, quality: u8) -> Result<String>;
-
-// 生成预览
-async fn generate_preview(input: String, params: WatermarkParams) -> Result<String>;
-
-// 取消处理
-async fn cancel_processing() -> Result<()>;
-```
----
-
-## 6. 非功能需求
-
-### 6.1 性能
-
-| 指标 | 要求 |
-|---|---|
-| 单图处理 | 4000x3000 图片加文本水印 <= 500ms |
-| 批量吞吐 | 100 张 2000x2000 图片 <= 60s |
-| 预览响应 | 调节参数后预览更新 <= 1s (Debounce 300ms + 渲染 <= 700ms) |
-| 内存占用 | 处理 100 张 20MB 图片峰值 <= 1GB |
-| 启动时间 | 冷启动 <= 3s |
-
-### 6.2 安全
-
-- 所有图像处理在本地完成，零网络请求
-- 导入图片仅读取不修改原文件
-- 输出路径由用户明确指定，不会覆盖用户文件
-- 支持沙箱文件对话框 (Tauri 安全策略)
-
-### 6.3 可用性
-
-- 支持导入文件夹包含子文件夹(递归/不递归选项)
-- 大图片自动缩放到适合预览的大小
-- 处理进度通过系统通知提示
-- 错误消息可理解且提供操作建议
-
-### 6.4 兼容性
-
-| 平台 | 最低版本 |
-|---|---|
-| Windows | Windows 10 1809+ (x64) |
-| macOS | macOS 11 Big Sur+ (Intel & Apple Silicon) |
-| Linux | 支持 AppImage / deb / rpm |
-
----
-
-## 7. 里程碑规划
-
-| 阶段 | 周期 | 交付物 |
-|---|---|---|
-| M1 - 原型 | 第 1-2 周 | Tauri 脚手架 + Rust 单图文本水印 + 基础 UI 框架 + 拖拽导入 |
-| M2 - MVP | 第 3-4 周 | 三类水印完整 + 批量处理引擎 + 预览网格 + 单张/ZIP 导出 |
-| M3 - 增强 | 第 5-6 周 | 水印叠加、预设管理、多主题、多语言、性能优化 |
-| M4 - 扩展 | 第 7-8 周 | 批量修改水印、去水印(实验性)、CLI 模式、稳定性测试 |
-
----
-
-## 8. 竞品对比
-
-| 特性 | WatermarkForge | 市面在线工具 | PhotoShop 动作 | 脚本方案 |
-|---|---|---|---|---|
-| 本地化 | 完全离线 | 需上传 | 本地 | 本地 |
-| 批量处理 | 原生并行 | 依赖网络 | 需配置 | 需写脚本 |
-| 水印类型 | 文本/图片/图案 | 通常仅文本+图片 | 全功能 | 取决于脚本 |
-| 实时预览 | 网格对比 | 单张预览 | 有 | 无 |
-| 使用门槛 | 低 (GUI) | 低 | 中-高 | 高 |
-| 成本 | 免费 | 免费/付费订阅 | 付费 | 免费 |
-| 扩展性 | 插件架构预留 | 封闭 | 动作扩展 | 灵活 |
-
----
-
-## 9. 技术风险与应对
-
-| 风险 | 影响 | 应对方案 |
-|---|---|---|
-| Rust 图像库对中文渲染支持不足 | 中文水印无法正常渲染 | 使用 imageproc + ab_glyph 加载系统中文 TTF 字体 |
-| 大图批量处理内存不足 | OOM 崩溃 | 分批处理 + 流式读写 + 内存池控制 |
-| Tauri v2 API 变动 | 构建失败 | 锁定 Tauri 版本，跟踪 changelog |
-| 混合模式实现复杂 | 效果与 PhotoShop 不一致 | 优先实现 normal/multiply/screen，参照 SVG 合成规范 |
-| 去水印功能质量不达预期 | 用户失望 | 初期标记为实验性功能(Beta)，提供显式免责说明 |
-
----
-
-## 10. 附录
-
-### A. 目录结构规划
-
-```
-watermark-forge/
-  src/                          # 前端 React 代码
-    components/                 # UI 组件
-      ImportPanel/
-      PreviewGrid/
-      WatermarkPanel/
-        TextWatermark.tsx
-        ImageWatermark.tsx
-        PatternWatermark.tsx
-      ExportDialog/
-      StatusBar/
-    hooks/                      # 自定义 hooks
-    stores/                     # 状态管理
-    types/                      # TypeScript 类型
-    i18n/                       # 国际化
-    App.tsx
-  src-tauri/                    # Rust 后端
-    src/
-      main.rs                   # 入口 + Tauri 命令注册
-      processor/                # 水印处理模块
-        mod.rs
-        text.rs
-        image.rs
-        pattern.rs
-        pipeline.rs
-      export/                   # 导出模块
-      io/                       # 文件 I/O
-      types.rs                  # 共享数据类型
-    Cargo.toml
-    tauri.conf.json
-  package.json
-  vite.config.ts
-  README.md
-```
-
-### B. 扩展设计: 水印处理器 trait (Rust)
-
-```rust
-/// 所有水印处理器必须实现的接口
-#[async_trait]
-pub trait WatermarkProcessor: Send + Sync {
-    fn id(&self) -> &str;
-    fn display_name(&self) -> &str;
-
-    async fn process(
-        &self,
-        image: &mut DynamicImage,
-        params: &WatermarkParams,
-        ctx: &ProcessingContext,
-    ) -> Result<ProcessingResult, ProcessingError>;
-
-    async fn preview(
-        &self,
-        image: &DynamicImage,
-        params: &WatermarkParams,
-    ) -> Result<Vec<u8>, ProcessingError>;
-}
-
-pub struct ProcessorRegistry {
-    processors: HashMap<String, Box<dyn WatermarkProcessor>>,
-}
-
-impl ProcessorRegistry {
-    pub fn register(&mut self, processor: Box<dyn WatermarkProcessor>) {
-        self.processors.insert(processor.id().to_string(), processor);
-    }
-}
+// watermarkEngine.ts — 核心渲染入口
+function applyTextWatermark(ctx, image, params: TextWatermarkParams): void
+function applyImageWatermark(ctx, image, imgLogo, params: ImageWatermarkParams): void
+function applyPatternWatermark(ctx, image, params: PatternWatermarkParams): void
+function applyAllWatermarks(ctx, image, text, image, pattern): void
 ```
 
 ---
 
-> **本文档为初期草案，后续将根据开发实践和用户反馈持续迭代。**
-## 6. P2 --- 水印去除 (Watermark Removal)
+## 4. 功能需求 — P2: 去水印 (Watermark Removal) ✅ 已完成
 
-### 6.1 功能概述
+### 4.1 功能概述
 
-集成 `watermark-remover` (YOLOv8 + LaMa) 作为后端引擎，实现**批量去除图片水印**功能。用户选择图片后，通过 AI 自动检测水印区域并智能修复。
+集成 `watermark-remover` (YOLOv8 + LaMa) 作为后端引擎，实现批量去除图片水印功能。用户选择图片后，通过 AI 自动检测水印区域并智能修复。
 
-### 6.2 参考项目
-
-| 项目 | 参考价值 |
-|---|---|
-| santifer/watermark-remover | 核心引擎: YOLOv8 目标检测 + LaMa 图像修复, 100% 离线, 轻量 CLI |
-
-### 6.3 用户流程
+### 4.2 用户流程
 
 ```
-导入图片 → 选择「去水印」模式 → 配置参数 → 预览检测区域 → 执行去除 → 导出结果
+导入图片 → 选择「去水印」Tab → 配置参数 → 自动检测 → 预览/调整检测框 → 批量去除 → 导出结果
 ```
 
-#### 步骤说明
-
-| 步骤 | 描述 |
-|---|---|
-| 1. 模式切换 | 在水印类型标签中新增「去水印」Tab，与应用水印模式并列 |
-| 2. 参数配置 | 置信度阈值、检测区域约束、修复方法选择（LaMa/OpenCV）、角标回退策略 |
-| 3. 预览检测 | 在执行修复前，用矩形框标注 YOLO 检测到的水印区域，用户可调整 |
-| 4. 批量执行 | Tauri 后端调度 Python 子进程，逐张处理图片 |
-| 5. 进度反馈 | WebSocket 事件实时推送处理进度（当前/总数） |
-| 6. 结果导出 | 与现有导出流程一致，支持单张下载或 ZIP 打包 |
-
-### 6.4 功能需求
-
-#### F3: 水印检测
+### 4.3 F7: 水印检测
 
 | 项 | 描述 |
 |---|---|
 | 自动检测 | YOLOv8 模型自动识别图片中的水印区域 |
-| 区域标注 | 在预览图中用半透明矩形框标出检测到的水印位置 |
+| 区域标注 | 在预览图中用半透明红色矩形框标出检测到的水印位置 |
 | 置信度调节 | 用户可调节 YOLO 检测阈值 (0.0 - 1.0)，默认 0.5 |
-| 手动修正 | 支持用户手动增加/删除/调整检测区域（v2.1+） |
+| 手动修正 | 支持用户拖拽调整检测框位置和大小、删除多余检测框 |
 | 角标回退 | YOLO 未检测到时，自动使用角落区域作为水印位置 |
-| 强制角标 | 用户可强制跳过 YOLO 检测，直接使用角标模式 |
+| 放大编辑 | 点击预览图放大后支持精确框选操作 |
+| 应用到全部 | 将用户调整后的框选位置批量应用到所有图片 |
 
-#### F4: 水印修复
+### 4.4 F8: 图像修复
 
 | 项 | 描述 |
 |---|---|
@@ -520,35 +282,244 @@ impl ProcessorRegistry {
 | 模型缓存 | LaMa 模型 (~200MB) 首次运行时自动下载并缓存 |
 | 区域扩展 | 支持 padding 参数，扩展检测区域周边像素 |
 
-#### F5: 参数面板
+### 4.5 F9: 去水印参数面板
 
 | 参数 | 类型 | 默认值 | 说明 |
 |---|---|---|---|
 | 检测置信度 | slider 0-100 | 50 | YOLO 检测阈值 (映射为 0.0-1.0) |
 | 检测区域扩展 | number | 10 | 检测框外扩像素 |
-| 修复方法 | select | lama | lama (高质) / opencv (快速) |
+| 修复方法 | select | lama | lama (高质量) / opencv (快速) |
 | 启用角标回退 | toggle | true | YOLO 未命中时使用角标 |
 | 角标位置 | select | bottom-right | 回退使用的角落 |
 | 角标宽度比例 | slider 0-50% | 12% | 角标区域占图片宽度比例 |
 | 角标高度比例 | slider 0-50% | 8% | 角标区域占图片高度比例 |
 | 强制角标模式 | toggle | false | 跳过 YOLO，直接使用角标 |
 
-### 6.5 技术约束
+### 4.6 后端 API 端点
+
+| 端点 | 方法 | 功能 |
+|---|---|---|
+| `/api/health` | GET | 服务健康检查 |
+| `/api/env` | GET | Python 环境检测 |
+| `/api/model-health` | GET | LaMa 模型状态检查 |
+| `/api/detect` | POST | YOLO 检测水印区域，返回检测框坐标 |
+| `/api/remove` | POST | 自动检测并去除水印，返回已修复图片 |
+| `/api/remove-bbox` | POST | 使用自定义检测框去除水印 |
+
+### 4.7 技术约束
 
 | 约束项 | 说明 |
 |---|---|
 | Python 版本 | 需要系统安装 Python 3.10+ |
-| 依赖安装 | 用户首次使用去水印功能时，自动检测并提示安装依赖 |
-| 模型下载 | LaMa 模型 (~200MB) 首次运行时自动下载到 `~/.cache/torch/hub/checkpoints/` |
-| 运行环境 | 强制 CPU 模式 (环境变量 `CUDA_VISIBLE_DEVICES=""`) |
-| 内存需求 | 建议 ≥8GB RAM，处理大图时可能需要更多 |
-| 处理速度 | LaMa 模式约 5-30s/张 (取决于图片尺寸)，OpenCV 模式约 1-3s/张 |
+| 依赖安装 | 需要 `pip install watermark-remover` 及依赖 |
+| 模型下载 | LaMa 模型 (~200MB) 首次使用时自动下载 |
+| 运行环境 | 强制 CPU 模式 |
+| 内存需求 | 建议 ≥8GB RAM |
 
-### 6.6 扩展性预留
+---
 
-- **自定义模型**: 预留接口支持用户导入自定义 YOLO 模型文件
-- **批量参数预设**: 支持保存/加载去水印参数组合
-- **多轮修复**: 支持对同一图片进行多次修复 (v2.2+)
-- **视频去水印**: 架构预留帧序列处理能力 (v3.0+)
+## 5. 功能需求 — P3: 编辑水印 (Edit Watermark) 📋 规划中
+
+### 5.1 功能概述
+
+新增**编辑水印**工作模式，与"添加水印"、"去除水印"并列。用户可选中图片中的现有文字水印，修改其内容和样式，由后端完成"去除原文字 + 渲染新文字"的完整流程。
+
+### 5.2 用户流程
+
+```
+切换到「编辑水印」Tab → 导入/选择图片 → 自动 OCR 检测 → 选中文字框 → 自动分析样式 → 修改文字/样式 → 预览效果 → 应用到当前/全部 → 导出
+```
+
+### 5.3 F10: 文字检测 (OCR)
+
+| 项 | 描述 |
+|---|---|
+| 检测引擎 | PaddleOCR 替代 YOLO，返回文字内容 + 位置 |
+| 检测模式 | `POST /api/detect {mode:\'text\'}` 复用现有端点 |
+| 返回信息 | OCR 框坐标、识别文字内容、置信度 |
+| 预览标注 | 蓝色检测框（区别于去水印的红色），框上显示文字标签 |
+| 交互操作 | 双击文字框进入编辑状态 |
+
+### 5.4 F11: 样式自动分析
+
+| 项 | 描述 |
+|---|---|
+| 分析端点 | `POST /api/analyze-text-style` |
+| 自动提取 | 颜色、字体大小、透明度、阴影、描边 |
+| 手动覆盖 | 用户可在面板中手动调整任何样式参数 |
+
+### 5.5 F12: 文字编辑与渲染
+
+| 项 | 描述 |
+|---|---|
+| 编辑端点 | `POST /api/edit-text` — 后端 Pipeline: Inpaint + Pillow 渲染 |
+| 内容修改 | 用户修改文字内容（如日期水印改为新值） |
+| 样式调整 | 颜色、字体、大小、透明度、阴影、描边、旋转 |
+| 实时预览 | 前端 Canvas 快速渲染（<50ms 延迟） |
+| 最终渲染 | 后端 Pillow 高质量渲染（抗锯齿、边缘羽化） |
+
+### 5.6 F13: 批量编辑
+
+| 项 | 描述 |
+|---|---|
+| 批量端点 | `POST /api/batch-edit-text` |
+| 模板匹配 | 基于相对坐标 + 正则匹配，自动定位同类水印 |
+| 应用全部 | 将第一张图的编辑操作应用到文件夹内所有匹配图片 |
+
+### 5.7 新增后端 API
+
+| 端点 | 方法 | 功能 |
+|---|---|---|
+| `/api/detect?mode=text` | POST | PaddleOCR 检测文字区域和内容 |
+| `/api/analyze-text-style` | POST | 分析文字区域视觉样式 |
+| `/api/edit-text` | POST | 去除原文字 + 渲染新文字 |
+| `/api/batch-edit-text` | POST | 批量编辑文字水印 |
+
+### 5.8 新增/改造前端组件
+
+| 组件 | 变更 |
+|---|---|
+| `WatermarkPanel` | 新增第五个 Tab「编辑水印」 |
+| `TextEditForm` | 新增：文字编辑参数面板 |
+| `DetectionEditor` | 改造：支持蓝色检测框、双击编辑、文字标签浮层 |
+| `watermarkEngine.ts` | 新增 `previewTextEdit()` 前端实时预览 |
+| `watermarkRemover.ts` | 新增 `editText()` / `analyzeTextStyle()` API 客户端 |
+
+---
+
+## 6. 扩展性设计
+
+### 6.1 工作模式架构
+
+三种工作模式并列，共享导入、预览、导出流程：
+
+```
++-------------------------------------+
+|          WatermarkForge               |
++-------------------------------------+
+|  [添加水印]  [编辑水印]  [去除水印]   |
++----------+----------+---------------+
+|  文本     |  OCR 检测 |  YOLO 检测    |
+|  图片     |  样式分析  |  LaMa 修复    |
+|  图案     |  文字替换  |  角标回退     |
+|  预览     |  实时预览  |  框选编辑     |
+|  导出     |  批量应用  |  批量去除     |
++----------+----------+---------------+
+```
+
+### 6.2 前后端分工原则
+
+- **前端负责**: 用户交互、参数配置、实时预览、导出打包
+- **后端负责**: AI 检测 (YOLO/PaddleOCR)、图像修复 (LaMa/OpenCV)、高质量渲染 (Pillow)
+
+### 6.3 未来扩展
+
+| 功能 | 路线图 | 预估版本 |
+|---|---|---|
+| 批量修改水印参数（预设管理） | 独立功能 | v1.1 |
+| 视频去水印（帧序列处理） | 架构预留 | v2.0 |
+| 自定义 YOLO 模型导入 | 去水印增强 | v1.1 |
+| 水印参数预设保存/加载 | 添加水印增强 | v1.1 |
+| 多轮修复 | 去水印增强 | v1.2 |
+
+---
+
+## 7. 版本历史
+
+| 版本 | 日期 | 变更内容 |
+|---|---|---|
+| v1.0 | 2026-07 | MVP 版本：文本/图片/图案水印 + 批量预览 + ZIP 导出 |
+| v1.01 | 2026-07 | Bug 修复：文字缩小、导出乱码、编辑状态保持 |
+| v1.02 | 2026-07 | 去水印功能：YOLOv8 + LaMa + 检测框编辑 + 批量去除 |
+| v1.03 | 📋 规划 | 编辑水印功能：OCR + 样式分析 + 文字替换 |
+
+---
+
+## 8. 界面设计原则
+
+### 8.1 布局
+
+```
++------+----------------------+------+
+|      |                      |      |
+| 导入  |    预览网格 /         | 水印  |
+| 面板  |    图片查看器         | 参数  |
+|      |                      | 面板  |
+|      |                      |      |
++------+----------------------+------+
+|            状态栏                    |
++------------------------------------+
+```
+
+- **左侧**: 图片导入面板（文件列表 + 导入按钮）
+- **中央**: 预览网格（缩略图网格 / 单图放大查看）
+- **右侧**: 水印参数配置面板（Tab 切换不同水印类型）
+- **底部**: 状态栏（进度、缩放、中英文切换、导出按钮）
+
+### 8.2 设计风格
+
+- **颜色主题**: 深色背景 + 紫色系强调色 (#7C3AED / #8B5CF6)
+- **卡片风格**: 圆角卡片，轻微阴影，层次分明
+- **响应式**: 面板可折叠，预览网格自适应缩放
+
+---
+
+## 9. 日志与调试
+
+### 9.1 前端日志
+
+日志文件存储路径: `logs/frontend-*.log`
+
+### 9.2 后端日志
+
+日志文件存储路径: `logs/python-api.log`
+
+```python
+# server/remover_api.py 内置 logging 配置
+log_dir = Path('logs/')
+log_file = log_dir / 'python-api.log'
+```
+
+---
+
+## 10. 多语言
+
+内置中/英文界面，通过右下角切换按钮实时切换：
+
+| 语言 | 文件 | 覆盖范围 |
+|---|---|---|
+| 英文 | `src/i18n/en.ts` | 全部 UI 文本 |
+| 中文 | `src/i18n/zh.ts` | 全部 UI 文本 |
+
+---
+
+## 11. 构建与部署
+
+### 11.1 开发环境
+
+```bash
+# 后端
+cd server
+pip install -r requirements.txt
+python remover_api.py     # 启动后端 :5178
+
+# 前端（另一个终端）
+npm install
+npm run dev              # 启动前端 :5173
+```
+
+### 11.2 一键启动
+
+```bash
+# Windows
+start.bat                # 同时启动前端 + 后端 + 打开浏览器
+```
+
+### 11.3 生产构建
+
+```bash
+npm run build            # 输出到 dist/
+npm run preview          # 预览构建产物
+```
 
 ---
