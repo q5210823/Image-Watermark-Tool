@@ -6,6 +6,9 @@
 </div>
 
 ---
+<img width="1330" height="710" alt="image" src="https://github.com/user-attachments/assets/5732e0ef-83b8-4ed5-b415-dc4a7164b6fc" />
+<img width="1330" height="710" alt="image" src="https://github.com/user-attachments/assets/37c3c92a-d44e-462c-be23-04db8f70689f" />
+
 
 ## English
 
