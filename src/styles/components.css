@@ -240,11 +240,15 @@
   padding: 2px;
 }
 .compare-toggle button {
-  padding: 4px 8px;
+  padding: 5px 12px;
   font-size: var(--font-size-xs);
   border-radius: 3px;
   color: var(--text-muted);
+  cursor: pointer;
+  border: none;
+  background: transparent;
   transition: all var(--transition-fast);
+  white-space: nowrap;
 }
 .compare-toggle button.active {
   background: var(--accent);
@@ -517,18 +521,21 @@ input[type='color'] {
 .btn-secondary:hover { background: var(--bg-hover); color: var(--text-primary); }
 
 .btn-outline {
-  padding: 6px 12px;
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
+  padding: 5px 14px;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  color: white;
   border-radius: var(--radius-sm);
   font-size: var(--font-size-xs);
+  font-weight: 500;
   transition: all var(--transition-fast);
   display: flex;
   align-items: center;
   gap: 4px;
+  cursor: pointer;
+  white-space: nowrap;
 }
-.btn-outline:hover { border-color: var(--text-muted); color: var(--text-primary); }
+.btn-outline:hover { opacity: 0.9; transform: translateY(-1px); }
 
 .btn-sm-icon {
   padding: 4px;
@@ -641,7 +648,8 @@ input[type='color'] {
   padding: 4px;
   opacity: 0;
   transition: opacity 0.2s;
-  pointer-events: none;
+  cursor: pointer;
+  z-index: 10;
 }
 .preview-card:hover .preview-card-zoom { opacity: 1; }
 
@@ -933,3 +941,123 @@ input[type='color'] {
   z-index: 6;
 }
 .det-thumb-box:hover .det-thumb-x { opacity: 1; }
+
+/* ─── Edit Mode (P3) ───────────────────────────── */
+.ocr-thumb-box {
+  position: absolute;
+  border: 1.5px solid rgba(59, 130, 246, 0.8);
+  background: rgba(59, 130, 246, 0.1);
+  border-radius: 2px;
+  cursor: pointer;
+  z-index: 5;
+  transition: border-color 0.15s, background 0.15s;
+}
+.ocr-thumb-box:hover,
+.ocr-thumb-box.active {
+  border-color: rgba(59, 130, 246, 1);
+  background: rgba(59, 130, 246, 0.25);
+  border-width: 2px;
+}
+.ocr-thumb-label {
+  position: absolute;
+  top: -14px;
+  left: 0;
+  font-size: 9px;
+  color: #93c5fd;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  background: rgba(0,0,0,0.7);
+  padding: 0 4px;
+  border-radius: 2px;
+  line-height: 14px;
+}
+
+/* Detection editor in edit mode (blue theme) */
+.det-box.edit-mode {
+  border-color: rgba(96, 165, 250, 0.8);
+  background: rgba(96, 165, 250, 0.08);
+}
+.det-box.edit-mode:hover {
+  border-color: rgba(96, 165, 250, 1);
+  background: rgba(96, 165, 250, 0.2);
+}
+
+/* OCR box list */
+.ocr-box-list {
+  margin-bottom: 12px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.ocr-box-list-title {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.ocr-box-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.1s;
+  font-size: 12px;
+}
+.ocr-box-item:hover {
+  background: var(--bg-hover);
+}
+.ocr-box-item.active {
+  background: rgba(139, 92, 246, 0.2);
+  border: 1px solid rgba(139, 92, 246, 0.4);
+}
+.ocr-box-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ocr-box-conf {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+/* Edit form */
+.text-edit-form {
+  padding: 0;
+}
+.edit-params {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.form-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+.edit-preview {
+  margin-top: 8px;
+}
+
+/* Secondary tabs for add-mode sub-navigation */
+.wm-type-tabs.secondary {
+  padding: 0 12px;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+.wm-type-tabs.secondary .wm-type-tab {
+  font-size: 11px;
+  padding: 4px 10px;
+}
+
+/* Preview area header - fix button alignment */
+.preview-area-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  gap: 8px;
+}

@@ -4,7 +4,7 @@ import { useAppStore } from '../../stores/useAppStore'
 import { applyWatermark, generatePreview } from '../../utils/watermarkEngine'
 import { useTranslation } from '../../i18n/useTranslation'
 import { DetectionEditor } from '../ImageViewer/DetectionEditor'
-import type { EditableBbox } from '../../types'
+import type { EditableBbox, ImageItem } from '../../types'
 
 type CompareMode = 'original' | 'processed'
 let _di = 0
@@ -15,6 +15,7 @@ export function PreviewGrid() {
   const images = useAppStore((s) => s.images)
   const selectedImageId = useAppStore((s) => s.selectedImageId)
   const getActiveParams = useAppStore((s) => s.getActiveParams)
+  const workMode = useAppStore((s) => s.workMode)
   const activeWatermarkType = useAppStore((s) => s.activeWatermarkType)
   const textParams = useAppStore((s) => s.textParams)
   const imageParams = useAppStore((s) => s.imageParams)
@@ -24,13 +25,18 @@ export function PreviewGrid() {
   const userBboxes = useAppStore((s) => s.userBboxes)
   const setUserBboxes = useAppStore((s) => s.setUserBboxes)
   const setSelectedImageIdStore = useAppStore((s) => s.setSelectedImageId)
+  const ocrResults = useAppStore((s) => s.ocrResults)
+  const editParams = useAppStore((s) => s.editParams)
+  const setEditParams = useAppStore((s) => s.setEditParams)
 
   const [compareMode, setCompareMode] = useState<CompareMode>('processed')
   const [previews, setPreviews] = useState<Record<string, string>>({})
   const [editingImageId, setEditingImageId] = useState<string | null>(null)
+  const [viewerImgUrl, setViewerImgUrl] = useState<string | null>(null)
   const [thumbDrag, setThumbDrag] = useState<{ imgId: string; boxId: string; sx: number; sy: number; orig: EditableBbox; imgW: number; imgH: number } | null>(null)
 
-  const isRemoverMode = activeWatermarkType === 'remover'
+  const isRemoverMode = workMode === 'remove'
+  const isEditMode = workMode === 'edit'
 
   // Recalculate previews for watermark modes
   useEffect(() => {
@@ -44,30 +50,29 @@ export function PreviewGrid() {
         setPreviews((prev) => ({ ...prev, [img.id]: preview }))
       } catch { /* ignore */ }
     })
-  }, [activeWatermarkType, textParams, imageParams, patternParams, images.length, images.filter(i => i.status === 'done').length])
+  }, [activeWatermarkType, textParams, imageParams, patternParams, images.length])
 
-  // Fix Bug 3: Show processedDataUrl for done images even in remover mode
+  // Fix Bug 3: Show processedDataUrl for done images
   const getDisplayUrl = useCallback((img) => {
     if (compareMode === 'original') return img.dataUrl
-    // For processed images, show the result regardless of mode
     if (img.status === 'done' && img.processedDataUrl) return img.processedDataUrl
-    if (isRemoverMode) return img.dataUrl // remover with no result yet → original
+    if (isRemoverMode || isEditMode) return img.processedDataUrl || img.dataUrl
     if (img.status === 'done' && img.processedDataUrl) return img.processedDataUrl
     return previews[img.id] || img.dataUrl
-  }, [compareMode, previews, isRemoverMode])
+  }, [compareMode, previews, isRemoverMode, isEditMode])
 
   const handleCardClick = useCallback((img) => {
     setSelectedImageIdStore(img.id)
-    if (isRemoverMode) setEditingImageId(img.id)
-  }, [setSelectedImageIdStore, isRemoverMode])
+    if (isRemoverMode || isEditMode) setEditingImageId(img.id)
+  }, [setSelectedImageIdStore, isRemoverMode, isEditMode])
 
-  // Delete a box
+  // Delete a box (remover mode)
   const handleDeleteBox = useCallback((e: React.MouseEvent, imgId: string, boxId: string) => {
     e.stopPropagation()
     setUserBboxes(imgId, (userBboxes[imgId] || []).filter(b => b.id !== boxId))
   }, [userBboxes, setUserBboxes])
 
-  // Start dragging
+  // Start dragging (remover mode)
   const handleBoxMouseDown = useCallback((e: React.MouseEvent, imgId: string, box: EditableBbox, imgW: number, imgH: number) => {
     e.preventDefault(); e.stopPropagation()
     setThumbDrag({ imgId, boxId: box.id, sx: e.clientX, sy: e.clientY, orig: { ...box }, imgW, imgH })
@@ -76,8 +81,6 @@ export function PreviewGrid() {
   useEffect(() => {
     if (!thumbDrag) return
     const onMove = (e: MouseEvent) => {
-      // Need the actual displayed image size to calculate correct drag delta
-      // For now use container-based approximation since thumbnails are small
       const container = document.querySelector('.preview-card-images')
       if (!container) return
       const cr = container.getBoundingClientRect()
@@ -102,52 +105,63 @@ export function PreviewGrid() {
     return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp) }
   }, [thumbDrag, userBboxes, setUserBboxes])
 
+  // Select OCR box in edit mode (click on text region in thumbnail)
+  const handleOcrBoxClick = useCallback((e: React.MouseEvent, imgId: string, boxId: string) => {
+    e.stopPropagation()
+    const boxes = ocrResults[imgId] || []
+    const box = boxes.find(b => b.id === boxId)
+    if (box) {
+      setEditParams({ selectedOcrId: boxId, newText: box.text })
+    }
+  }, [ocrResults, setEditParams])
+
+  // Handle zoom: show processed result if available, else original
+  const handleZoom = useCallback((e: React.MouseEvent, img: ImageItem) => {
+    e.stopPropagation()
+    // Get latest image data from store to avoid stale closure
+    const latest = useAppStore.getState().images.find(i => i.id === img.id) || img
+    const url = (latest.status === "done" && latest.processedDataUrl) ? latest.processedDataUrl : latest.dataUrl
+    setViewerImgUrl(url)
+  }, [])
+
   return (
     <>
       <div className='preview-area'>
-        <div className='preview-toolbar'>
-          <div className='preview-toolbar-left'>
-            <Grid3X3 size={14} style={{ color: 'var(--text-muted)' }} />
-            <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>
-              {images.filter((i) => i.status === 'done').length}/{images.length} {t.files.processed}
+        <div className='preview-area-header'>
+          <div className='compare-toggle'>
+            <span style={{ fontSize: 13, fontWeight: 500, marginRight: 8 }}>
+              {isRemoverMode ? t.remover.detectionPreview : ''}
             </span>
+            <button className={compareMode === 'original' ? 'active' : ''} onClick={() => setCompareMode('original')}>{t.common.original}</button>
+            <button className={compareMode === 'processed' ? 'active' : ''} onClick={() => setCompareMode('processed')}>{t.common.watermarked}</button>
           </div>
-          <div className='preview-toolbar-right'>
-            <div className='compare-toggle'>
-              <button className={compareMode === 'original' ? 'active' : ''} onClick={() => setCompareMode('original')}>{t.common.original}</button>
-              <button className={compareMode === 'processed' ? 'active' : ''} onClick={() => setCompareMode('processed')}>{t.common.watermarked}</button>
-            </div>
-            <button className='btn-outline' onClick={() => setShowExportDialog(true)}>
-              <Download size={12} /> Export
-            </button>
-          </div>
+          <button className='btn-outline' onClick={() => setShowExportDialog(true)}>
+            <Download size={12} /> {t.common.export}
+          </button>
         </div>
 
         <div className='preview-grid'>
           {images.map((img) => {
             const boxes = isRemoverMode ? (userBboxes[img.id] || []) : []
-            // Fix Bug 1: Calculate exact box positions accounting for object-fit: contain in square container
+            const ocrBoxes = isEditMode ? (ocrResults[img.id] || []) : []
             const containerIsSquare = true
             const imgAspect = img.width / img.height
             let scaleW = 1, scaleH = 1, offX = 0, offY = 0
             if (imgAspect >= 1) {
-              // Landscape or square: fills width, height proportional
               scaleH = 1 / imgAspect
               offY = (1 - scaleH) / 2 * 100
             } else {
-              // Portrait: fills height, width proportional
               scaleW = imgAspect
               offX = (1 - scaleW) / 2 * 100
             }
             return (
               <div
                 key={img.id}
-                className={'preview-card' + (img.id === selectedImageId ? ' selected' : '') + (isRemoverMode ? ' has-det' : '')}
+                className={'preview-card' + (img.id === selectedImageId ? ' selected' : '') + (isRemoverMode ? ' has-det' : '') + (isEditMode ? ' has-ocr' : '')}
                 onClick={() => handleCardClick(img)}
               >
                 <div className='preview-card-images'>
                   {isRemoverMode ? (
-                    // Single image layer for remover mode (no double image stack)
                     <img src={getDisplayUrl(img)} alt={img.name} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                   ) : (
                     <>
@@ -155,7 +169,7 @@ export function PreviewGrid() {
                       <img src={getDisplayUrl(img)} alt={img.name + ' wm'} style={{ opacity: compareMode === 'original' ? 0 : 1 }} />
                     </>
                   )}
-                  {/* Interactive boxes with corrected positioning */}
+                  {/* Remover mode: interactive red boxes */}
                   {isRemoverMode && boxes.map((box, bi) => {
                     const bl = offX + (box.x1 / img.width) * scaleW * 100
                     const bt = offY + (box.y1 / img.height) * scaleH * 100
@@ -170,12 +184,30 @@ export function PreviewGrid() {
                       </div>
                     )
                   })}
-                  <div className='preview-card-zoom'><Maximize2 size={14} /></div>
+                  {/* Edit mode: blue OCR boxes with text labels */}
+                  {isEditMode && ocrBoxes.map((ocrBox) => {
+                    const [x1, y1, x2, y2] = ocrBox.bbox
+                    const bl = offX + (x1 / img.width) * scaleW * 100
+                    const bt = offY + (y1 / img.height) * scaleH * 100
+                    const bw = ((x2 - x1) / img.width) * scaleW * 100
+                    const bh = ((y2 - y1) / img.height) * scaleH * 100
+                    return (
+                      <div key={ocrBox.id}
+                        className={'ocr-thumb-box' + (editParams.selectedOcrId === ocrBox.id ? ' active' : '')}
+                        style={{ left: `${bl}%`, top: `${bt}%`, width: `${bw}%`, height: `${bh}%` }}
+                        onClick={(e) => handleOcrBoxClick(e, img.id, ocrBox.id)}>
+                        <span className='ocr-thumb-label'>{ocrBox.text}</span>
+                      </div>
+                    )
+                  })}
+                  <div className='preview-card-zoom' onClick={(e) => handleZoom(e, img)}><Maximize2 size={14} /></div>
                 </div>
                 <div className='preview-card-footer'>
                   <span>{img.name}</span>
                   <span style={{ color: img.status === 'done' ? 'var(--success)' : 'var(--text-muted)', fontSize: 'var(--font-size-xs)' }}>
-                    {isRemoverMode ? `${boxes.length} box${boxes.length !== 1 ? 'es' : ''}` : (img.status === 'done' ? t.common.done : img.status === 'error' ? t.common.error : t.common.pending)}
+                    {isRemoverMode ? `${boxes.length} box${boxes.length !== 1 ? 'es' : ''}`
+                      : isEditMode ? `${ocrBoxes.length} text${ocrBoxes.length !== 1 ? 's' : ''}`
+                      : (img.status === 'done' ? t.common.done : img.status === 'error' ? t.common.error : t.common.pending)}
                   </span>
                 </div>
               </div>
@@ -191,19 +223,20 @@ export function PreviewGrid() {
         </div>
       </div>
 
-      {/* Detection Editor (Fix Bug 2: use composite key to force remount on change) */}
+      {/* Detection Editor overlay (remover mode) */}
       {editingImageId && isRemoverMode && (
         <DetectionEditor key={'de_' + editingImageId + '_' + (userBboxes[editingImageId]?.length || 0)} imageId={editingImageId} onClose={() => setEditingImageId(null)} />
       )}
 
-      {editingImageId && !isRemoverMode && (
-        <div className='viewer-overlay' onClick={() => setEditingImageId(null)}>
-          <button className='viewer-close' onClick={() => setEditingImageId(null)}>
+      {/* Image viewer overlay (all modes) */}
+      {viewerImgUrl && (
+        <div className='viewer-overlay' onClick={() => setViewerImgUrl(null)}>
+          <button className='viewer-close' onClick={() => setViewerImgUrl(null)}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
-          <img src={images.find(i => i.id === editingImageId)?.dataUrl || ''} alt='' onClick={(e) => e.stopPropagation()} />
+          <img src={viewerImgUrl} alt='' onClick={(e) => e.stopPropagation()} />
         </div>
       )}
     </>

@@ -1,4 +1,4 @@
-﻿import type { WatermarkParams, TextWatermarkParams, ImageWatermarkParams, PatternWatermarkParams, PositionPreset } from "../types";
+﻿import type { TextStyle, WatermarkParams, TextWatermarkParams, ImageWatermarkParams, PatternWatermarkParams, PositionPreset } from "../types";
 
 function getPositionCoords(
   preset: PositionPreset, offsetX: number, offsetY: number, margin: number,
@@ -178,6 +178,78 @@ export async function applyWatermark(
     }
     await renderPatternWatermark(ctx, canvas.width, canvas.height, p);
   }
+
+  return canvas.toDataURL("image/png");
+}
+
+/**
+ * Preview text edit on an image canvas (low-latency, for real-time preview)
+ * Renders new text with the given style on top of the source image
+ */
+export async function previewTextEdit(
+  sourceDataUrl: string,
+  text: string,
+  style: TextStyle,
+  bbox: [number, number, number, number],
+  maxWidth: number = 400
+): Promise<string> {
+  const img = new Image();
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve();
+    img.onerror = reject;
+    img.src = sourceDataUrl;
+  });
+
+  const scale = Math.min(1, maxWidth / img.naturalWidth);
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(img.naturalWidth * scale);
+  canvas.height = Math.round(img.naturalHeight * scale);
+  const ctx = canvas.getContext("2d")!;
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+  // Scale bbox to canvas size
+  const sx = bbox[0] * scale;
+  const sy = bbox[1] * scale;
+  const sw = (bbox[2] - bbox[0]) * scale;
+  const sh = (bbox[3] - bbox[1]) * scale;
+
+  // Calculate font size to fit within the bbox
+  const fontSize = Math.max(10, Math.min(style.fontSize * scale, sh * 0.8));
+
+  ctx.save();
+  ctx.globalAlpha = style.opacity / 100;
+
+  // Font
+  ctx.font = `bold ${fontSize}px "${style.fontFamily}", sans-serif`;
+  ctx.textBaseline = "middle";
+  ctx.textAlign = "center";
+
+  const cx = sx + sw / 2;
+  const cy = sy + sh / 2;
+
+  // Rotation
+  ctx.translate(cx, cy);
+  ctx.rotate((style.rotation * Math.PI) / 180);
+  ctx.translate(-cx, -cy);
+
+  // Shadow
+  if (style.shadow?.enabled) {
+    ctx.shadowColor = style.shadow.color;
+    ctx.shadowBlur = style.shadow.blur * scale;
+    ctx.shadowOffsetX = style.shadow.offsetX * scale;
+    ctx.shadowOffsetY = style.shadow.offsetY * scale;
+  }
+
+  // Stroke
+  if (style.stroke?.enabled) {
+    ctx.strokeStyle = style.stroke.color;
+    ctx.lineWidth = Math.max(1, style.stroke.width * scale);
+    ctx.strokeText(text, cx, cy);
+  }
+
+  ctx.fillStyle = style.color;
+  ctx.fillText(text, cx, cy);
+  ctx.restore();
 
   return canvas.toDataURL("image/png");
 }

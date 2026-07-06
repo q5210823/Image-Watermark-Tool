@@ -183,3 +183,62 @@ export interface EditableBbox {
   fallback?: boolean;
   locked?: boolean;
 }
+
+// ─── P3 Edit Watermark types ──────────────────────────
+export type WorkMode = 'add' | 'edit' | 'remove';
+
+export interface OcrBox {
+  id: string;
+  bbox: [number, number, number, number]; // [x1, y1, x2, y2]
+  text: string;
+  confidence: number;
+}
+
+export interface TextStyle {
+  fontSize: number;
+  fontFamily: string;
+  color: string;
+  opacity: number;
+  rotation: number;
+  shadow: ShadowConfig | null;
+  stroke: StrokeConfig | null;
+}
+
+export interface EditWatermarkParams {
+  type: 'edit';
+  ocrBoxes: OcrBox[];
+  selectedOcrId: string | null;
+  newText: string;
+  style: TextStyle;
+}
+
+export const DEFAULT_TEXT_STYLE: TextStyle = {
+  fontSize: 24,
+  fontFamily: 'Arial',
+  color: '#3A3A3A',
+  opacity: 85,
+  rotation: 0,
+  shadow: { enabled: true, color: '#000000', blur: 3, offsetX: 2, offsetY: 2 },
+  stroke: null,
+};
+
+export const DEFAULT_EDIT_PARAMS: EditWatermarkParams = {
+  type: 'edit',
+  ocrBoxes: [],
+  selectedOcrId: null,
+  newText: '',
+  style: { ...DEFAULT_TEXT_STYLE },
+};
+
+export interface OcrDetectionResult {
+  ocrBoxes: OcrBox[];
+}
+
+export interface TextStyleAnalysis {
+  color: string;
+  fontSize: number;
+  opacity: number;
+  hasShadow: boolean;
+  hasStroke: boolean;
+  rotation: number;
+}

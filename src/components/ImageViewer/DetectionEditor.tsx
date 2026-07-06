@@ -16,16 +16,18 @@ export function DetectionEditor({ imageId, onClose }: Props) {
   const userBboxes = useAppStore((s) => s.userBboxes)
   const setUserBboxes = useAppStore((s) => s.setUserBboxes)
   const setSelectedImageId = useAppStore((s) => s.setSelectedImageId)
+  const workMode = useAppStore((s) => s.workMode)
 
   const img = images.find(i => i.id === imageId)
   const boxes = userBboxes[imageId] || []
 
   const containerRef = useRef<HTMLDivElement>(null)
   const imgRef = useRef<HTMLImageElement>(null)
-  const [loaded, setLoaded] = useState(false) // Force re-render after img loads
+  const [loaded, setLoaded] = useState(false)
   const [drag, setDrag] = useState<{ id: string; type: 'move' | 'resize'; handle?: string; sx: number; sy: number; orig: EditableBbox } | null>(null)
 
-  // Get image offset within container (accounting for centering)
+  const isEditMode = workMode === 'edit'
+
   const getImgOffset = useCallback(() => {
     const cr = containerRef.current?.getBoundingClientRect()
     const ir = imgRef.current?.getBoundingClientRect()
@@ -36,9 +38,8 @@ export function DetectionEditor({ imageId, onClose }: Props) {
       scx: ir.width / img.width,
       scy: ir.height / img.height,
     }
-  }, [img, loaded]) // depend on loaded to recalculate after image renders
+  }, [img, loaded])
 
-  // Select this image in the store
   useEffect(() => { setSelectedImageId(imageId) }, [imageId, setSelectedImageId])
 
   const updateBox = useCallback((boxId: string, upd: Partial<EditableBbox>) => {
@@ -69,7 +70,6 @@ export function DetectionEditor({ imageId, onClose }: Props) {
   useEffect(() => {
     if (!drag || !img || !imgRef.current || !containerRef.current) return
     const { scx, scy } = getImgOffset()
-
     const onMove = (e: MouseEvent) => {
       const dx = (e.clientX - drag.sx) / scx
       const dy = (e.clientY - drag.sy) / scy
@@ -99,7 +99,9 @@ export function DetectionEditor({ imageId, onClose }: Props) {
       <div className='det-editor-toolbar'>
         <span style={{ color: '#fff', fontSize: 13 }}>{img.name} ({img.width}&times;{img.height}) {boxes.length} box(es)</span>
         <div style={{ display: 'flex', gap: 6 }}>
-          <button className='det-editor-btn' onClick={(e) => { e.stopPropagation(); addBox() }}><Plus size={14} /> Add Box</button>
+          {!isEditMode && (
+            <button className='det-editor-btn' onClick={(e) => { e.stopPropagation(); addBox() }}><Plus size={14} /> Add Box</button>
+          )}
           <button className='det-editor-btn' onClick={(e) => { e.stopPropagation(); onClose() }}>Done &#10003;</button>
         </div>
       </div>
@@ -110,10 +112,14 @@ export function DetectionEditor({ imageId, onClose }: Props) {
           const l = ox + box.x1 * scx, t = oy + box.y1 * scy
           const w = (box.x2 - box.x1) * scx, h = (box.y2 - box.y1) * scy
           return (
-            <div key={box.id} className='det-box' style={{ left: l, top: t, width: w, height: h }}
+            <div key={box.id}
+              className={'det-box' + (isEditMode ? ' edit-mode' : '')}
+              style={{ left: l, top: t, width: w, height: h }}
               onMouseDown={(e) => handleMouseDown(e, box.id)}>
-              <span className='det-box-label'>{Math.round(box.confidence * 100)}%</span>
-              <span className='det-box-x' onMouseDown={(e) => { e.stopPropagation(); removeBox(box.id) }}><Trash2 size={10} /></span>
+              <span className='det-box-label'>{isEditMode ? 'Edit' : `${Math.round(box.confidence * 100)}%`}</span>
+              {!isEditMode && (
+                <span className='det-box-x' onMouseDown={(e) => { e.stopPropagation(); removeBox(box.id) }}><Trash2 size={10} /></span>
+              )}
               <span className='det-handle nw' data-dir='nw' /><span className='det-handle ne' data-dir='ne' />
               <span className='det-handle sw' data-dir='sw' /><span className='det-handle se' data-dir='se' />
               <span className='det-handle n' data-dir='n' /><span className='det-handle s' data-dir='s' />

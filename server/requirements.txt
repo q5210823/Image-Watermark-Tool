@@ -3,3 +3,5 @@ fastapi>=0.115.0
 python-multipart>=0.0.12
 pillow>=9.0.0
 watermark-remover>=0.1.0
+
+opencv-python-headless>=4.7.0

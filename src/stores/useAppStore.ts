@@ -4,9 +4,10 @@ import type {
   ExportSettings, PositionPreset,
   TextWatermarkParams, ImageWatermarkParams, PatternWatermarkParams,
   WatermarkRemovalParams, DetectionBox, EditableBbox,
+  WorkMode, OcrBox, EditWatermarkParams, TextStyle,
 } from '../types';
 import {
-  DEFAULT_TEXT_PARAMS, DEFAULT_IMAGE_PARAMS, DEFAULT_PATTERN_PARAMS, DEFAULT_REMOVER_PARAMS,
+  DEFAULT_TEXT_PARAMS, DEFAULT_IMAGE_PARAMS, DEFAULT_PATTERN_PARAMS, DEFAULT_REMOVER_PARAMS, DEFAULT_EDIT_PARAMS,
 } from '../types';
 
 interface AppState {
@@ -20,7 +21,11 @@ interface AppState {
   updateImageStatus: (id: string, status: ImageItem['status'], processedDataUrl?: string | null, error?: string) => void;
   reorderImages: (from: number, to: number) => void;
 
-  // Watermark type
+  // Work mode: 'add' | 'edit' | 'remove'
+  workMode: WorkMode;
+  setWorkMode: (mode: WorkMode) => void;
+
+  // Watermark type (for add mode)
   activeWatermarkType: WatermarkType | 'remover';
   setActiveWatermarkType: (type: WatermarkType | 'remover') => void;
 
@@ -33,6 +38,8 @@ interface AppState {
   setPatternParams: (params: Partial<PatternWatermarkParams>) => void;
   removerParams: WatermarkRemovalParams;
   setRemoverParams: (params: Partial<WatermarkRemovalParams>) => void;
+  editParams: EditWatermarkParams;
+  setEditParams: (params: Partial<EditWatermarkParams>) => void;
 
   getActiveParams: () => WatermarkParams;
 
@@ -40,6 +47,11 @@ interface AppState {
   detectionResults: Record<string, DetectionBox[]>;
   setDetectionResults: (imageId: string, detections: DetectionBox[]) => void;
   clearDetectionResults: () => void;
+
+  // OCR results for edit mode
+  ocrResults: Record<string, OcrBox[]>;
+  setOcrResults: (imageId: string, boxes: OcrBox[]) => void;
+  clearOcrResults: () => void;
 
   // User-adjusted bboxes per image (for draggable preview)
   userBboxes: Record<string, EditableBbox[]>;
@@ -86,6 +98,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       return { images: arr };
     }),
 
+  workMode: 'add',
+  setWorkMode: (mode) => set({ workMode: mode }),
+
   activeWatermarkType: 'text',
   setActiveWatermarkType: (type) => set({ activeWatermarkType: type }),
 
@@ -97,6 +112,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   setPatternParams: (params) => set((s) => ({ patternParams: { ...s.patternParams, ...params } })),
   removerParams: { ...DEFAULT_REMOVER_PARAMS },
   setRemoverParams: (params) => set((s) => ({ removerParams: { ...s.removerParams, ...params } })),
+  editParams: { ...DEFAULT_EDIT_PARAMS },
+  setEditParams: (params) => set((s) => ({ editParams: { ...s.editParams, ...params } })),
 
   getActiveParams: () => {
     const s = get();
@@ -112,6 +129,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   setDetectionResults: (imageId, detections) =>
     set((s) => ({ detectionResults: { ...s.detectionResults, [imageId]: detections } })),
   clearDetectionResults: () => set({ detectionResults: {} }),
+
+  ocrResults: {},
+  setOcrResults: (imageId, boxes) =>
+    set((s) => ({ ocrResults: { ...s.ocrResults, [imageId]: boxes } })),
+  clearOcrResults: () => set({ ocrResults: {} }),
 
   userBboxes: {},
   setUserBboxes: (imageId, boxes) =>

@@ -1,4 +1,4 @@
-﻿import type { WatermarkRemovalParams, DetectionBox } from '../types';
+import type { WatermarkRemovalParams, DetectionBox, OcrBox, TextStyleAnalysis, TextStyle } from '../types';
 import { logger } from './logger';
 
 const MODULE = 'watermarkRemover';
@@ -127,6 +127,110 @@ export async function removeWithBbox(
     });
   } catch (err: any) {
     logger.error(MODULE, `removeWithBbox failed: ${err.message}`, err);
+    throw err;
+  }
+}
+
+// ─── P3: Edit Watermark API ──────────────────────
+
+/**
+ * OCR detect: call /api/detect with mode='text' to detect text regions
+ */
+export async function ocrDetect(
+  imageDataUrl: string,
+): Promise<{ ocrBoxes: OcrBox[] }> {
+  logger.debug(MODULE, 'ocrDetect: calling API');
+  const blob = dataUrlToBlob(imageDataUrl);
+  const form = new FormData();
+  form.append('file', blob, 'image.png');
+  form.append('mode', 'text');
+
+  try {
+    const res = await fetch(`${API_BASE}/detect?mode=text`, {
+      method: 'POST',
+      body: form,
+      signal: AbortSignal.timeout(60000),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`);
+    const data = await res.json();
+    logger.debug(MODULE, `ocrDetect: ${data.ocrBoxes?.length || 0} texts detected`);
+    const boxes = (data.ocrBoxes || []).map((b: any, i: number) => ({
+      ...b,
+      id: b.id || `ocr_${Date.now()}_${i}`,
+    }));
+    return { ocrBoxes: boxes };
+  } catch (err: any) {
+    logger.error(MODULE, `ocrDetect failed: ${err.message}`, err);
+    throw err;
+  }
+}
+
+/**
+ * Analyze text style in a specific bounding box
+ */
+export async function analyzeTextStyle(
+  imageDataUrl: string,
+  bbox: [number, number, number, number],
+): Promise<TextStyleAnalysis> {
+  logger.debug(MODULE, 'analyzeTextStyle: calling API');
+  const blob = dataUrlToBlob(imageDataUrl);
+  const form = new FormData();
+  form.append('file', blob, 'image.png');
+  form.append('bbox', JSON.stringify(bbox));
+
+  try {
+    const res = await fetch(`${API_BASE}/analyze-text-style`, {
+      method: 'POST',
+      body: form,
+      signal: AbortSignal.timeout(30000),
+    });
+    if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`);
+    const data = await res.json();
+    logger.debug(MODULE, 'analyzeTextStyle result', data);
+    return data;
+  } catch (err: any) {
+    logger.error(MODULE, `analyzeTextStyle failed: ${err.message}`, err);
+    return { color: '#000000', fontSize: 24, opacity: 85, hasShadow: false, hasStroke: false, rotation: 0 };
+  }
+}
+
+/**
+ * Edit text in image: replaces old text with new text using inpainting + Pillow rendering
+ */
+export async function editText(
+  imageDataUrl: string,
+  edits: Array<{
+    bbox: [number, number, number, number];
+    new_text: string;
+    style: TextStyle;
+  }>,
+): Promise<string> {
+  logger.debug(MODULE, `editText: ${edits.length} edits`);
+  const blob = dataUrlToBlob(imageDataUrl);
+  const form = new FormData();
+  form.append('file', blob, 'image.png');
+  form.append('edits', JSON.stringify(edits));
+
+  try {
+    const res = await fetch(`${API_BASE}/edit-text`, {
+      method: 'POST',
+      body: form,
+      signal: AbortSignal.timeout(180000),
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => 'Unknown');
+      throw new Error(`API error ${res.status}: ${errText}`);
+    }
+    const blobOut = await res.blob();
+    logger.debug(MODULE, `editText: received ${blobOut.size} bytes`);
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error('Failed to read result blob'));
+      reader.readAsDataURL(blobOut);
+    });
+  } catch (err: any) {
+    logger.error(MODULE, `editText failed: ${err.message}`, err);
     throw err;
   }
 }
